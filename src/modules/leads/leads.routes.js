@@ -86,7 +86,7 @@ router.get('/', async (req, res, next) => {
     if (start_date)  { where += ' AND l.created_at>=?'; p.push(start_date+' 00:00:00'); }
     if (end_date)    { where += ' AND l.created_at<=?'; p.push(end_date+' 23:59:59'); }
 
-    const [[{ total }]] = await query(
+    const [{ total }] = await query(
       `SELECT COUNT(*) AS total FROM leads l WHERE ${where}`, p
     );
 
