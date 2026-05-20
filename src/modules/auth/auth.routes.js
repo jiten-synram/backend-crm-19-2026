@@ -13,7 +13,7 @@ const signRefresh = id => jwt.sign({ id }, process.env.JWT_REFRESH_SECRET, { exp
 // ── POST /api/auth/login ───────────────────────────────────────
 router.post('/login', async (req, res, next) => {
   try {
-    console.log('BODY:', req.body);
+    // console.log('BODY:', req.body);
     const { email, password } = req.body;
     if (!email || !password) throw new AppError('Email and password required.');
 
