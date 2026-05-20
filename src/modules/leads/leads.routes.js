@@ -16,17 +16,64 @@ const scopeClause = (user, alias = 'l') => {
 };
 
 // ── GET /api/leads ─────────────────────────────────────────────
+// router.get('/', async (req, res, next) => {
+//   try {
+//     const { search, status, source, category, campaign_id, assigned_to,
+//             is_repeat, start_date, end_date, page=1, limit=25 } = req.query;
+
+//     let where = '1=1';
+//     const p = [];
+
+//     if (!isAdmin(req.user)) { where += ' AND l.assigned_to=?'; p.push(req.user.id); }
+//     else if (assigned_to)   { where += ' AND l.assigned_to=?'; p.push(assigned_to); }
+
+//     if (search) {
+//       where += ' AND (l.name LIKE ? OR l.phone LIKE ? OR l.email LIKE ?)';
+//       const s = `%${search}%`; p.push(s,s,s);
+//     }
+//     if (status)      { where += ' AND l.status=?';      p.push(status); }
+//     if (source)      { where += ' AND l.source=?';      p.push(source); }
+//     if (category)    { where += ' AND l.category=?';    p.push(category); }
+//     if (campaign_id) { where += ' AND l.campaign_id=?'; p.push(campaign_id); }
+//     if (is_repeat)   { where += ' AND l.is_repeat=?';   p.push(is_repeat==='true'?1:0); }
+//     if (start_date)  { where += ' AND l.created_at>=?'; p.push(start_date+' 00:00:00'); }
+//     if (end_date)    { where += ' AND l.created_at<=?'; p.push(end_date+' 23:59:59'); }
+
+//     const offset = (Number(page)-1) * Number(limit);
+//     const [[{ total }]] = await Promise.all([
+//       query(`SELECT COUNT(*) AS total FROM leads l WHERE ${where}`, p)
+//     ]);
+//     const leads = await query(`
+//       SELECT l.*,
+//         u.name AS assigned_name, u.email AS assigned_email,
+//         c.name AS campaign_name,
+//         cu.total_orders AS cust_orders, cu.lifetime_value AS cust_ltv
+//       FROM leads l
+//       LEFT JOIN users u     ON u.id = l.assigned_to
+//       LEFT JOIN campaigns c ON c.id = l.campaign_id
+//       LEFT JOIN customers cu ON cu.id = l.linked_customer_id
+//       WHERE ${where}
+//       ORDER BY l.created_at DESC
+//       LIMIT ? OFFSET ?
+//     `, [...p, Number(limit), offset]);
+
+//     res.json({ success:true, total: total||0, page:Number(page), pages:Math.ceil((total||0)/Number(limit)), leads });
+//   } catch (err) { next(err); }
+// });
+
 router.get('/', async (req, res, next) => {
   try {
     const { search, status, source, category, campaign_id, assigned_to,
             is_repeat, start_date, end_date, page=1, limit=25 } = req.query;
+    
+    const limitNum  = parseInt(limit)  || 25;
+    const pageNum   = parseInt(page)   || 1;
+    const offset    = (pageNum - 1) * limitNum;
 
     let where = '1=1';
     const p = [];
-
     if (!isAdmin(req.user)) { where += ' AND l.assigned_to=?'; p.push(req.user.id); }
     else if (assigned_to)   { where += ' AND l.assigned_to=?'; p.push(assigned_to); }
-
     if (search) {
       where += ' AND (l.name LIKE ? OR l.phone LIKE ? OR l.email LIKE ?)';
       const s = `%${search}%`; p.push(s,s,s);
@@ -39,10 +86,10 @@ router.get('/', async (req, res, next) => {
     if (start_date)  { where += ' AND l.created_at>=?'; p.push(start_date+' 00:00:00'); }
     if (end_date)    { where += ' AND l.created_at<=?'; p.push(end_date+' 23:59:59'); }
 
-    const offset = (Number(page)-1) * Number(limit);
-    const [[{ total }]] = await Promise.all([
-      query(`SELECT COUNT(*) AS total FROM leads l WHERE ${where}`, p)
-    ]);
+    const [[{ total }]] = await query(
+      `SELECT COUNT(*) AS total FROM leads l WHERE ${where}`, p
+    );
+
     const leads = await query(`
       SELECT l.*,
         u.name AS assigned_name, u.email AS assigned_email,
@@ -54,10 +101,16 @@ router.get('/', async (req, res, next) => {
       LEFT JOIN customers cu ON cu.id = l.linked_customer_id
       WHERE ${where}
       ORDER BY l.created_at DESC
-      LIMIT ? OFFSET ?
-    `, [...p, Number(limit), offset]);
+      LIMIT ${limitNum} OFFSET ${offset}
+    `, p);
 
-    res.json({ success:true, total: total||0, page:Number(page), pages:Math.ceil((total||0)/Number(limit)), leads });
+    res.json({
+      success: true,
+      total: total || 0,
+      page: pageNum,
+      pages: Math.ceil((total || 0) / limitNum),
+      leads
+    });
   } catch (err) { next(err); }
 });
 
