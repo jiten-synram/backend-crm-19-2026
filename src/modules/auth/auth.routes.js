@@ -19,11 +19,11 @@ router.post('/login', async (req, res, next) => {
 
     const [user] = await query('SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
     if (!user || !user.is_active)
-      throw new AppError('Invalid credentials.', 4010);
+      throw new AppError('Invalid credentials.', 401);
 
     const match = await bcrypt.compare(password, user.password);
     console.log(match);
-    if (!match) throw new AppError('Invalid credentials.', 4011);
+    if (!match) throw new AppError('Invalid credentials.', 401);
 
     const accessToken  = signAccess(user.id);
     const refreshToken = signRefresh(user.id);
