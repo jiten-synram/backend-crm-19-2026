@@ -7,19 +7,50 @@ const { findCustomerByFingerprint } = require('../../services/crm.service');
 const router = express.Router();
 router.use(protect);
 
+// router.get('/', async (req, res, next) => {
+//   try {
+//     const { search, page=1, limit=25 } = req.query;
+//     let where='1=1'; const p=[];
+//     if(search){ where+=' AND (c.name LIKE ? OR c.phone LIKE ?)'; const s=`%${search}%`; p.push(s,s); }
+//     const [[{total}]] = await Promise.all([query(`SELECT COUNT(*) AS total FROM customers c WHERE ${where}`,p)]);
+//     const customers = await query(`
+//       SELECT c.*, u.name AS agent_name
+//       FROM customers c LEFT JOIN users u ON u.id=c.assigned_to
+//       WHERE ${where} ORDER BY c.last_purchase DESC LIMIT ? OFFSET ?
+//     `,[...p,Number(limit),(Number(page)-1)*Number(limit)]);
+//     res.json({ success:true, total, customers });
+//   } catch(err){ next(err); }
+// });
+
 router.get('/', async (req, res, next) => {
   try {
     const { search, page=1, limit=25 } = req.query;
-    let where='1=1'; const p=[];
-    if(search){ where+=' AND (c.name LIKE ? OR c.phone LIKE ?)'; const s=`%${search}%`; p.push(s,s); }
-    const [[{total}]] = await Promise.all([query(`SELECT COUNT(*) AS total FROM customers c WHERE ${where}`,p)]);
+    const limitNum = parseInt(limit) || 25;
+    const pageNum  = parseInt(page)  || 1;
+    const offset   = (pageNum - 1) * limitNum;
+
+    let where = '1=1'; const p = [];
+    if (search) {
+      where += ' AND (c.name LIKE ? OR c.phone LIKE ?)';
+      const s = `%${search}%`; p.push(s, s);
+    }
+
+    // ✅ Fix 1 — [[{total}]] → [{total}]
+    const [{ total }] = await query(
+      `SELECT COUNT(*) AS total FROM customers c WHERE ${where}`, p
+    );
+
+    // ✅ Fix 2 — LIMIT/OFFSET directly
     const customers = await query(`
       SELECT c.*, u.name AS agent_name
-      FROM customers c LEFT JOIN users u ON u.id=c.assigned_to
-      WHERE ${where} ORDER BY c.last_purchase DESC LIMIT ? OFFSET ?
-    `,[...p,Number(limit),(Number(page)-1)*Number(limit)]);
-    res.json({ success:true, total, customers });
-  } catch(err){ next(err); }
+      FROM customers c LEFT JOIN users u ON u.id = c.assigned_to
+      WHERE ${where}
+      ORDER BY c.last_purchase DESC
+      LIMIT ${limitNum} OFFSET ${offset}
+    `, p);
+
+    res.json({ success: true, total, customers });
+  } catch(err) { next(err); }
 });
 
 router.get('/lookup', async (req, res, next) => {
