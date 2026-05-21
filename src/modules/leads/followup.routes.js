@@ -32,6 +32,18 @@ fuRouter.get('/follow-ups', async (req, res, next) => {
     const [{ total }] = await query(
       `SELECT COUNT(*) AS total FROM follow_ups f WHERE f.status='pending' ${scope} ${dateC}`
     );
+    // const items = await query(`
+    //   SELECT f.*, l.name AS lead_name, l.phone AS lead_phone,
+    //          l.status AS lead_status, l.category,
+    //          u.name AS agent_name
+    //   FROM follow_ups f
+    //   LEFT JOIN leads l ON l.id = f.lead_id
+    //   LEFT JOIN users u ON u.id = f.assigned_to
+    //   WHERE f.status='pending' ${scope} ${dateC}
+    //   ORDER BY f.scheduled_at ${tab === 'upcoming' ? 'ASC' : 'DESC'}
+    //   LIMIT ? OFFSET ?
+    // `, [Number(limit), offset]);
+
     const items = await query(`
       SELECT f.*, l.name AS lead_name, l.phone AS lead_phone,
              l.status AS lead_status, l.category,
@@ -41,8 +53,8 @@ fuRouter.get('/follow-ups', async (req, res, next) => {
       LEFT JOIN users u ON u.id = f.assigned_to
       WHERE f.status='pending' ${scope} ${dateC}
       ORDER BY f.scheduled_at ${tab === 'upcoming' ? 'ASC' : 'DESC'}
-      LIMIT ? OFFSET ?
-    `, [Number(limit), offset]);
+      LIMIT ${limitNum} OFFSET ${offset}
+    `);
 
     res.json({ success: true, total, tab, items });
   } catch (err) { next(err); }
@@ -61,13 +73,24 @@ fuRouter.get('/follow-ups/counts', async (req, res, next) => {
     const s = new Date(istNow); s.setUTCHours(0, 0, 0, 0);
     const e = new Date(istNow); e.setUTCHours(23, 59, 59, 999);
 
-    const [[ov], [td], [up]] = await Promise.all([
+    // const [[ov], [td], [up]] = await Promise.all([
+    //   query(`SELECT COUNT(*) AS c FROM follow_ups WHERE status='pending' ${scope} AND scheduled_at < ?`, [s]),
+    //   query(`SELECT COUNT(*) AS c FROM follow_ups WHERE status='pending' ${scope} AND scheduled_at BETWEEN ? AND ?`, [s, e]),
+    //   query(`SELECT COUNT(*) AS c FROM follow_ups WHERE status='pending' ${scope} AND scheduled_at > ?`, [e]),
+    // ]);
+
+    const [ov, td, up] = await Promise.all([
       query(`SELECT COUNT(*) AS c FROM follow_ups WHERE status='pending' ${scope} AND scheduled_at < ?`, [s]),
       query(`SELECT COUNT(*) AS c FROM follow_ups WHERE status='pending' ${scope} AND scheduled_at BETWEEN ? AND ?`, [s, e]),
       query(`SELECT COUNT(*) AS c FROM follow_ups WHERE status='pending' ${scope} AND scheduled_at > ?`, [e]),
     ]);
 
-    res.json({ success: true, counts: { overdue: Number(ov.c), today: Number(td.c), upcoming: Number(up.c) } });
+    // res.json({ success: true, counts: { overdue: Number(ov.c), today: Number(td.c), upcoming: Number(up.c) } });
+     res.json({ success: true, counts: {
+      overdue:  Number(ov[0].c),
+      today:    Number(td[0].c),
+      upcoming: Number(up[0].c)
+    }});
   } catch (err) { next(err); }
 });
 
