@@ -13,6 +13,11 @@ const fmtDt = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
 fuRouter.get('/follow-ups', async (req, res, next) => {
   try {
     const { tab = 'today', page = 1, limit = 20 } = req.query;
+    // ✅ Pehle ye define karo
+    const limitNum = parseInt(limit) || 20;
+    const pageNum  = parseInt(page)  || 1;
+    const offset   = (pageNum - 1) * limitNum;
+    
     const scope = isAdmin(req.user) ? '' : `AND f.assigned_to=${req.user.id}`;
 
     const now = new Date();
