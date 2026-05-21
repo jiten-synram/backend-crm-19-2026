@@ -13,6 +13,28 @@ const { query } = require('../config/db');
 //   } catch (e) { console.error('[CRON] followup job error:', e.message); }
 // });
 
+cron.schedule('* * * * * *', async () => {
+  try {
+    const r = await query(`
+      UPDATE follow_ups fu
+      INNER JOIN leads l ON l.id = fu.lead_id
+      SET 
+        fu.status = 'missed'
+      WHERE 
+        fu.status = 'pending'
+        AND fu.scheduled_at < NOW()
+        AND l.status != 'follow_up'
+    `);
+
+    if (r.affectedRows) {
+      console.log(`[CRON] Updated ${r.affectedRows} follow-ups`);
+    }
+
+  } catch (e) {
+    console.error('[CRON] followup job error:', e.message);
+  }
+});
+
 // Daily 8:00 AM IST (2:30 UTC) — log overdue summary
 cron.schedule('30 2 * * *', async () => {
   try {
