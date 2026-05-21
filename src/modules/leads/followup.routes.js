@@ -10,44 +10,86 @@ fuRouter.use(protect);
 const fmtDt = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
 
 // ── GET /follow-ups ────────────────────────────────────────────
+// fuRouter.get('/follow-ups', async (req, res, next) => {
+//   try {
+//     const { tab = 'today', page = 1, limit = 20 } = req.query;
+//     // ✅ Pehle ye define karo
+//     const limitNum = parseInt(limit) || 20;
+//     const pageNum  = parseInt(page)  || 1;
+//     const offset   = (pageNum - 1) * limitNum;
+    
+//     const scope = isAdmin(req.user) ? '' : `AND f.assigned_to=${req.user.id}`;
+
+//     const now = new Date();
+//     const istOffset = 5.5 * 60 * 60 * 1000;
+//     const istNow = new Date(now.getTime() + istOffset);
+//     const s = new Date(istNow); s.setUTCHours(0, 0, 0, 0);
+//     const e = new Date(istNow); e.setUTCHours(23, 59, 59, 999);
+
+//     // ✅ fmtDt use kiya — T nahi aayega
+//     const dateC = tab === 'overdue'
+//       ? `AND f.scheduled_at < '${fmtDt(s)}'`
+//       : tab === 'today'
+//       ? `AND f.scheduled_at BETWEEN '${fmtDt(s)}' AND '${fmtDt(e)}'`
+//       : `AND f.scheduled_at > '${fmtDt(e)}'`;
+
+//     const offset = (Number(page) - 1) * Number(limit);
+//     const [{ total }] = await query(
+//       `SELECT COUNT(*) AS total FROM follow_ups f WHERE f.status='pending' ${scope} ${dateC}`
+//     );
+//     // const items = await query(`
+//     //   SELECT f.*, l.name AS lead_name, l.phone AS lead_phone,
+//     //          l.status AS lead_status, l.category,
+//     //          u.name AS agent_name
+//     //   FROM follow_ups f
+//     //   LEFT JOIN leads l ON l.id = f.lead_id
+//     //   LEFT JOIN users u ON u.id = f.assigned_to
+//     //   WHERE f.status='pending' ${scope} ${dateC}
+//     //   ORDER BY f.scheduled_at ${tab === 'upcoming' ? 'ASC' : 'DESC'}
+//     //   LIMIT ? OFFSET ?
+//     // `, [Number(limit), offset]);
+
+//     const items = await query(`
+//       SELECT f.*, l.name AS lead_name, l.phone AS lead_phone,
+//              l.status AS lead_status, l.category,
+//              u.name AS agent_name
+//       FROM follow_ups f
+//       LEFT JOIN leads l ON l.id = f.lead_id
+//       LEFT JOIN users u ON u.id = f.assigned_to
+//       WHERE f.status='pending' ${scope} ${dateC}
+//       ORDER BY f.scheduled_at ${tab === 'upcoming' ? 'ASC' : 'DESC'}
+//       LIMIT ${limitNum} OFFSET ${offset}
+//     `);
+
+//     res.json({ success: true, total, tab, items });
+//   } catch (err) { next(err); }
+// });
+
 fuRouter.get('/follow-ups', async (req, res, next) => {
   try {
     const { tab = 'today', page = 1, limit = 20 } = req.query;
+    
     // ✅ Pehle ye define karo
     const limitNum = parseInt(limit) || 20;
     const pageNum  = parseInt(page)  || 1;
     const offset   = (pageNum - 1) * limitNum;
-    
+
     const scope = isAdmin(req.user) ? '' : `AND f.assigned_to=${req.user.id}`;
 
     const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000;
-    const istNow = new Date(now.getTime() + istOffset);
+    const istNow = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
     const s = new Date(istNow); s.setUTCHours(0, 0, 0, 0);
     const e = new Date(istNow); e.setUTCHours(23, 59, 59, 999);
 
-    // ✅ fmtDt use kiya — T nahi aayega
     const dateC = tab === 'overdue'
       ? `AND f.scheduled_at < '${fmtDt(s)}'`
       : tab === 'today'
       ? `AND f.scheduled_at BETWEEN '${fmtDt(s)}' AND '${fmtDt(e)}'`
       : `AND f.scheduled_at > '${fmtDt(e)}'`;
 
-    const offset = (Number(page) - 1) * Number(limit);
     const [{ total }] = await query(
       `SELECT COUNT(*) AS total FROM follow_ups f WHERE f.status='pending' ${scope} ${dateC}`
     );
-    // const items = await query(`
-    //   SELECT f.*, l.name AS lead_name, l.phone AS lead_phone,
-    //          l.status AS lead_status, l.category,
-    //          u.name AS agent_name
-    //   FROM follow_ups f
-    //   LEFT JOIN leads l ON l.id = f.lead_id
-    //   LEFT JOIN users u ON u.id = f.assigned_to
-    //   WHERE f.status='pending' ${scope} ${dateC}
-    //   ORDER BY f.scheduled_at ${tab === 'upcoming' ? 'ASC' : 'DESC'}
-    //   LIMIT ? OFFSET ?
-    // `, [Number(limit), offset]);
 
     const items = await query(`
       SELECT f.*, l.name AS lead_name, l.phone AS lead_phone,
