@@ -211,7 +211,7 @@ router.patch('/:id', async (req, res, next) => {
   try {
     const allowed = ['name','phone','email','alt_phone','city','state','age','gender',
                      'source','category','supplement','campaign_id','product_name',
-                     'order_amount','tracking_id','next_followup_at'];
+                     'order_amount','tracking_id','next_followup_at','remark'];
     const sets=[]; const vals=[];
     allowed.forEach(f => { if(req.body[f]!==undefined){ sets.push(`${f}=?`); vals.push(req.body[f]); } });
     if(!sets.length) throw new AppError('No fields to update.');
@@ -309,6 +309,39 @@ router.patch('/:id/assign', authorize('admin','sub_admin'), async (req, res, nex
       [assigned_to, req.user.id, req.params.id]);
     const [lead] = await query('SELECT l.*,u.name AS assigned_name FROM leads l LEFT JOIN users u ON u.id=l.assigned_to WHERE l.id=?', [req.params.id]);
     res.json({ success:true, lead });
+  } catch (err) { next(err); }
+});
+
+// ── PATCH /api/leads/bulk-assign ─────────────────────────────
+router.patch('/bulk-assign', authorize('admin', 'sub_admin'), async (req, res, next) => {
+  try {
+    const { ids, assigned_to } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0)
+      throw new AppError('ids array required.');
+    if (!assigned_to)
+      throw new AppError('assigned_to required.');
+
+    // User exist karta hai?
+    const [agent] = await query('SELECT id, name FROM users WHERE id=? AND is_active=1', [assigned_to]);
+    if (!agent) throw new AppError('Agent not found.', 404);
+
+    // Bulk update
+    const placeholders = ids.map(() => '?').join(',');
+    await query(
+      `UPDATE leads SET assigned_to=?, assigned_at=NOW(), assigned_by=?, is_manual_assign=1 WHERE id IN (${placeholders})`,
+      [assigned_to, req.user.id, ...ids]
+    );
+
+    // Activities log
+    for (const id of ids) {
+      await query(
+        `INSERT INTO activities (entity_type, entity_id, action, description, performed_by) VALUES ('lead', ?, 'assign', ?, ?)`,
+        [id, `Bulk assigned to ${agent.name}`, req.user.id]
+      );
+    }
+
+    res.json({ success: true, message: `${ids.length} leads assigned to ${agent.name}` });
   } catch (err) { next(err); }
 });
 
