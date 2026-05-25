@@ -168,9 +168,10 @@ dashRouter.get('/admin', authorize('admin','sub_admin'), async (req, res, next) 
       ? `AND created_at BETWEEN '${start_date} 00:00:00' AND '${end_date || new Date().toISOString().split('T')[0]} 23:59:59'`
       : '';
 
-    const [kpis, repCnt, monthlyRev, byStatus, bySource, userPerf, fuCounts] = await Promise.all([
+    const [kpis, repCnt, custCnt, monthlyRev, byStatus, bySource, userPerf, fuCounts] = await Promise.all([
       query(`SELECT status, COUNT(*) AS cnt, SUM(CASE WHEN revenue_countable=1 THEN COALESCE(order_amount,0) ELSE 0 END) AS revenue FROM leads WHERE 1=1 ${dateWhere} GROUP BY status`),
-      query(`SELECT COUNT(*) AS c FROM leads WHERE is_repeat=1 ${dateWhere}`),
+      query(`SELECT COUNT(*) AS c FROM orders WHERE is_repeat=1 ${dateWhere}`),
+      query(`SELECT COUNT(*) AS cus FROM customers WHERE is_active=1`),
       query(`SELECT YEAR(delivery_date) AS yr, MONTH(delivery_date) AS mo, SUM(amount) AS revenue, COUNT(*) AS orders FROM orders WHERE revenue_countable=1 AND delivery_date>=DATE_SUB(NOW(),INTERVAL 12 MONTH) GROUP BY yr,mo ORDER BY yr,mo`),
       query(`SELECT status, COUNT(*) AS cnt FROM leads WHERE 1=1 ${dateWhere} GROUP BY status`),
       query(`SELECT source, COUNT(*) AS cnt FROM leads WHERE 1=1 ${dateWhere} GROUP BY source`),
@@ -199,7 +200,7 @@ dashRouter.get('/admin', authorize('admin','sub_admin'), async (req, res, next) 
       })()
     ]);
 
-    const cards = { total:0, new:0, in_process:0, follow_up:0, converted:0, delivered:0, closed_lost:0, repeat_orders: Number(repCnt[0].c||0), total_revenue:0 };
+    const cards = { total:0, new:0, in_process:0, follow_up:0, converted:0, delivered:0, closed_lost:0, repeat_orders: Number(repCnt[0].c||0), customers: Number(custCnt[0].cus || 0), total_revenue:0 };
     kpis.forEach(k => { cards[k.status] = Number(k.cnt); cards.total += Number(k.cnt); cards.total_revenue += Number(k.revenue||0); });
     const userPerfWithRate = userPerf.map(u => ({ ...u, conversionRate: u.total_leads>0 ? +(u.converted/u.total_leads*100).toFixed(1) : 0 }));
 
@@ -289,16 +290,47 @@ dashRouter.get('/user', async (req, res, next) => {
 const repRouter = express.Router();
 repRouter.use(protect);
 
-const buildWhere=(q,user)=>{
-  let w='1=1';const p=[];
-  if(user.role==='sales'){w+=' AND l.assigned_to=?';p.push(user.id);}
-  else if(q.assigned_to){w+=' AND l.assigned_to=?';p.push(q.assigned_to);}
-  if(q.status){w+=' AND l.status=?';p.push(q.status);}
-  if(q.source){w+=' AND l.source=?';p.push(q.source);}
-  if(q.campaign_id){w+=' AND l.campaign_id=?';p.push(q.campaign_id);}
-  if(q.start_date){w+=' AND l.created_at>=?';p.push(q.start_date+' 00:00:00');}
-  if(q.end_date){w+=' AND l.created_at<=?';p.push(q.end_date+' 23:59:59');}
-  return{w,p};
+// const buildWhere=(q,user)=>{
+//   let w='1=1';const p=[];
+//   if(user.role==='sales'){w+=' AND l.assigned_to=?';p.push(user.id);}
+//   else if(q.assigned_to){w+=' AND l.assigned_to=?';p.push(q.assigned_to);}
+//   if(q.status){w+=' AND l.status=?';p.push(q.status);}
+//   if(q.source){w+=' AND l.source=?';p.push(q.source);}
+//   if(q.campaign_id){w+=' AND l.campaign_id=?';p.push(q.campaign_id);}
+//   if(q.start_date){w+=' AND l.created_at>=?';p.push(q.start_date+' 00:00:00');}
+//   if(q.end_date){w+=' AND l.created_at<=?';p.push(q.end_date+' 23:59:59');}
+//   return{w,p};
+// };
+
+const buildWhere = (q, user) => {
+  let w = '1=1'; const p = [];
+
+  if (user.role === 'sales') { w += ' AND l.assigned_to=?'; p.push(user.id); }
+  else if (q.assigned_to)   { w += ' AND l.assigned_to=?'; p.push(q.assigned_to); }
+
+  if (q.status)      { w += ' AND l.status=?';      p.push(q.status); }
+  if (q.source)      { w += ' AND l.source=?';      p.push(q.source); }
+  if (q.category)    { w += ' AND l.category=?';    p.push(q.category); }
+  if (q.campaign_id) { w += ' AND l.campaign_id=?'; p.push(q.campaign_id); }
+  if (q.start_date)  { w += ' AND l.created_at>=?'; p.push(q.start_date + ' 00:00:00'); }
+  if (q.end_date)    { w += ' AND l.created_at<=?'; p.push(q.end_date   + ' 23:59:59'); }
+
+  // ✅ Search filter
+  if (q.search) {
+    w += ' AND (l.name LIKE ? OR l.phone LIKE ? OR l.email LIKE ?)';
+    const s = `%${q.search}%`; p.push(s, s, s);
+  }
+
+  // ✅ Bulk selected IDs filter
+  if (q.ids) {
+    const ids = q.ids.split(',').map(id => parseInt(id)).filter(Boolean);
+    if (ids.length > 0) {
+      w += ` AND l.id IN (${ids.map(() => '?').join(',')})`;
+      p.push(...ids);
+    }
+  }
+
+  return { w, p };
 };
 
 repRouter.get('/revenue', async (req, res, next) => {
