@@ -54,7 +54,14 @@ router.get('/', async (req, res, next) => {
     // const [[{ total }]] = await Promise.all([
     //   query(`SELECT COUNT(*) AS total FROM leads l WHERE ${where}`, p)
     // ]);
-    const [{ total }] = await query(`SELECT COUNT(*) AS total FROM leads l WHERE ${where}`, p);
+
+
+    const totalRows = await query(
+      `SELECT COUNT(*) AS total FROM leads l WHERE ${where}`,
+      p
+    );
+    
+    const total = totalRows[0]?.total || 0;    
     const leads = await query(`
       SELECT l.*,
         u.name AS assigned_name, u.email AS assigned_email,
@@ -69,7 +76,14 @@ router.get('/', async (req, res, next) => {
       LIMIT ? OFFSET ?
     `, [...p, Number(limit), offset]);
 
-    res.json({ success:true, total: total||0, page:Number(page), pages:Math.ceil((total||0)/Number(limit)), leads });
+    // res.json({ success:true, total: total||0, page:Number(page), pages:Math.ceil((total||0)/Number(limit)), leads });
+    res.json({
+      success: true,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+      leads
+    });
   } catch (err) { next(err); }
 });
 
