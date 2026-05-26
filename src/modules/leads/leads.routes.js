@@ -73,8 +73,8 @@ router.get('/', async (req, res, next) => {
       LEFT JOIN customers cu ON cu.id = l.linked_customer_id
       WHERE ${where}
       ORDER BY l.created_at DESC
-      LIMIT ? OFFSET ?
-    `, [...p, Number(limit), offset]);
+      LIMIT ${safeLimit} OFFSET ${safeOffset}
+`, p);
 
     // res.json({ success:true, total: total||0, page:Number(page), pages:Math.ceil((total||0)/Number(limit)), leads });
     res.json({
