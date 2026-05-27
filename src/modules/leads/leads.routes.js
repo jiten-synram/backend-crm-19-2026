@@ -22,6 +22,10 @@ router.get('/', async (req, res, next) => {
             is_repeat, start_date, end_date, page=1, limit=25 } = req.query;
     const { exclude_statuses } = req.query;
 
+    const limitNum = parseInt(limit) || 25;
+const pageNum  = parseInt(page)  || 1;
+const offset   = (pageNum - 1) * limitNum;
+
     let where = '1=1';
     const p = [];
 
@@ -74,7 +78,7 @@ router.get('/', async (req, res, next) => {
       LEFT JOIN customers cu ON cu.id = l.linked_customer_id
       WHERE ${where}
       ORDER BY l.created_at DESC
-      LIMIT ${safeLimit} OFFSET ${safeOffset}
+      LIMIT ${limitNum} OFFSET ${safeOffset}
 `, p);
 
     res.json({ success:true, total: total||0, page:Number(page), pages:Math.ceil((total||0)/Number(limit)), leads });
