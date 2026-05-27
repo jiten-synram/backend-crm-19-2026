@@ -23,14 +23,12 @@ router.get('/', async (req, res, next) => {
     const { exclude_statuses } = req.query;
 
     const limitNum = parseInt(limit) || 25;
-const pageNum  = parseInt(page)  || 1;
-const offset   = (pageNum - 1) * limitNum;
+    const pageNum  = parseInt(page)  || 1;
+    const offset   = (pageNum - 1) * limitNum;
 
     let where = '1=1';
     const p = [];
 
-    
-    // ... baaki filters ke saath:
     if (exclude_statuses) {
       const excl = exclude_statuses.split(',').map(s => s.trim()).filter(Boolean);
       if (excl.length) {
@@ -41,11 +39,7 @@ const offset   = (pageNum - 1) * limitNum;
 
     if (!isAdmin(req.user)) { where += ' AND l.assigned_to=?'; p.push(req.user.id); }
     else if (assigned_to)   { where += ' AND l.assigned_to=?'; p.push(assigned_to); }
-
-    if (search) {
-      where += ' AND (l.name LIKE ? OR l.phone LIKE ? OR l.email LIKE ?)';
-      const s = `%${search}%`; p.push(s,s,s);
-    }
+    if (search)      { where += ' AND (l.name LIKE ? OR l.phone LIKE ? OR l.email LIKE ?)'; const s=`%${search}%`; p.push(s,s,s); }
     if (status)      { where += ' AND l.status=?';      p.push(status); }
     if (source)      { where += ' AND l.source=?';      p.push(source); }
     if (category)    { where += ' AND l.category=?';    p.push(category); }
@@ -54,41 +48,25 @@ const offset   = (pageNum - 1) * limitNum;
     if (start_date)  { where += ' AND l.created_at>=?'; p.push(start_date+' 00:00:00'); }
     if (end_date)    { where += ' AND l.created_at<=?'; p.push(end_date+' 23:59:59'); }
 
-    const offset = (Number(page)-1) * Number(limit);
-    // const [[{ total }]] = await Promise.all([
-    //   query(`SELECT COUNT(*) AS total FROM leads l WHERE ${where}`, p)
-    // ]);
+    const [{ total }] = await query(
+      `SELECT COUNT(*) AS total FROM leads l WHERE ${where}`, p
+    );
 
-
-    // const totalRows = await query(
-    //   `SELECT COUNT(*) AS total FROM leads l WHERE ${where}`,
-    //   p
-    // );
-    
-    // const total = totalRows[0]?.total || 0;   
-    const [{ total }] = await query(`SELECT COUNT(*) AS total FROM leads l WHERE ${where}`, p);
     const leads = await query(`
       SELECT l.*,
         u.name AS assigned_name, u.email AS assigned_email,
         c.name AS campaign_name,
         cu.total_orders AS cust_orders, cu.lifetime_value AS cust_ltv
       FROM leads l
-      LEFT JOIN users u     ON u.id = l.assigned_to
-      LEFT JOIN campaigns c ON c.id = l.campaign_id
+      LEFT JOIN users u      ON u.id = l.assigned_to
+      LEFT JOIN campaigns c  ON c.id = l.campaign_id
       LEFT JOIN customers cu ON cu.id = l.linked_customer_id
       WHERE ${where}
       ORDER BY l.created_at DESC
-      LIMIT ${limitNum} OFFSET ${safeOffset}
-`, p);
+      LIMIT ${limitNum} OFFSET ${offset}
+    `, p);
 
-    res.json({ success:true, total: total||0, page:Number(page), pages:Math.ceil((total||0)/Number(limit)), leads });
-    // res.json({
-    //   success: true,
-    //   total,
-    //   page: Number(page),
-    //   pages: Math.ceil(total / Number(limit)),
-    //   leads
-    // });
+    res.json({ success:true, total:total||0, page:pageNum, pages:Math.ceil((total||0)/limitNum), leads });
   } catch (err) { next(err); }
 });
 
