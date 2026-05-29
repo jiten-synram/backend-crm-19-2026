@@ -286,7 +286,7 @@ const processOrderDelivered = async (leadId, deliveryDate, trackingId = null) =>
     // UPDATE ORDER
     // ============================================================
 
-    await conn.execute(`
+    // await conn.execute(`
     //   UPDATE orders
     //   SET status='delivered',
     //       delivery_date=?,
