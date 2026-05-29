@@ -227,13 +227,13 @@ const processConverted = async (lead) => {
       const [custRes] = await conn.execute(`
         INSERT INTO customers (
           name, phone, alt_phone, email, city, state,
-          first_lead_id, assigned_to,
+          first_lead_id, assigned_to, shipping_address,
           total_orders, total_revenue, lifetime_value, avg_order_value,
           created_by
-        ) VALUES (?,?,?,?,?,?,?,?, 0,0,0,0, ?)
+        ) VALUES (?,?,?,?,?,?,?,?,?, 0,0,0,0, ?)
       `, [
         lead.name, lead.phone, lead.alt_phone||null, lead.email||null,
-        lead.city||null, lead.state||null, lead.id, lead.assigned_to,
+        lead.city||null, lead.state||null, lead.id, lead.assigned_to, lead.shipping_address || null,
         lead.assigned_to,   // ← sirf ek value, CURDATE() wale 2 hata diye
       ]);
 
