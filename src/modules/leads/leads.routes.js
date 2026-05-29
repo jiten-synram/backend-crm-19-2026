@@ -117,6 +117,50 @@ router.get('/stats/summary', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── PATCH /api/leads/bulk-assign ─────────────────────────────
+router.patch('/bulk-assign', authorize('admin', 'sub_admin'), async (req, res, next) => {
+  try {
+    const { ids, assigned_to } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0)
+      throw new AppError('ids array required.');
+    if (!assigned_to)
+      throw new AppError('assigned_to required.');
+
+    // User exist karta hai?
+    // const [agent] = await query('SELECT id, name FROM users WHERE id=? AND is_active=1', [assigned_to]);
+    const result = await query(
+      'SELECT id, name FROM users WHERE id=? AND is_active=1',
+      [assigned_to]
+    );
+const agent = Array.isArray(result) ? result[0] : result;
+    if (!agent) throw new AppError('Agent not found.', 404);
+
+    // Bulk update
+    // const placeholders = ids.map(() => '?').join(',');
+    if (!Array.isArray(ids)) {
+  throw new AppError('ids must be array', 400);
+}
+
+const safeIds = ids.map(Number).filter(Boolean);
+const placeholders = safeIds.map(() => '?').join(',');
+    await query(
+      `UPDATE leads SET assigned_to=?, assigned_at=NOW(), assigned_by=?, is_manual_assign=1 WHERE id IN (${placeholders})`,
+      [assigned_to, req.user.id, ...ids]
+    );
+
+    // Activities log
+    for (const id of ids) {
+      await query(
+        `INSERT INTO activities (entity_type, entity_id, action, description, performed_by) VALUES ('lead', ?, 'assign', ?, ?)`,
+        [id, `Bulk assigned to ${agent.name}`, req.user.id]
+      );
+    }
+
+    res.json({ success: true, message: `${ids.length} leads assigned to ${agent.name}` });
+  } catch (err) { next(err); }
+});
+
 // ── GET /api/leads/:id ─────────────────────────────────────────
 router.get('/:id', async (req, res, next) => {
   try {
@@ -431,37 +475,6 @@ router.patch('/:id/assign', authorize('admin','sub_admin'), async (req, res, nex
   } catch (err) { next(err); }
 });
 
-// ── PATCH /api/leads/bulk-assign ─────────────────────────────
-router.patch('/bulk-assign', authorize('admin', 'sub_admin'), async (req, res, next) => {
-  try {
-    const { ids, assigned_to } = req.body;
 
-    if (!ids || !Array.isArray(ids) || ids.length === 0)
-      throw new AppError('ids array required.');
-    if (!assigned_to)
-      throw new AppError('assigned_to required.');
-
-    // User exist karta hai?
-    const [agent] = await query('SELECT id, name FROM users WHERE id=? AND is_active=1', [assigned_to]);
-    if (!agent) throw new AppError('Agent not found.', 404);
-
-    // Bulk update
-    const placeholders = ids.map(() => '?').join(',');
-    await query(
-      `UPDATE leads SET assigned_to=?, assigned_at=NOW(), assigned_by=?, is_manual_assign=1 WHERE id IN (${placeholders})`,
-      [assigned_to, req.user.id, ...ids]
-    );
-
-    // Activities log
-    for (const id of ids) {
-      await query(
-        `INSERT INTO activities (entity_type, entity_id, action, description, performed_by) VALUES ('lead', ?, 'assign', ?, ?)`,
-        [id, `Bulk assigned to ${agent.name}`, req.user.id]
-      );
-    }
-
-    res.json({ success: true, message: `${ids.length} leads assigned to ${agent.name}` });
-  } catch (err) { next(err); }
-});
 
 module.exports = router;
