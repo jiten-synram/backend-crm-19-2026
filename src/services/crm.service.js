@@ -291,7 +291,7 @@ const processOrderDelivered = async (leadId, deliveryDate, trackingId = null) =>
       SET status='delivered',
           delivery_date=?,
           revenue_countable=1,
-          ${trackingId ? 'tracking_id=?,' : ''}
+          tracking_id   = COALESCE(?, tracking_id),
           updated_at=NOW()
       WHERE id=?
     `, trackingId ? [deliveryDate, trackingId, order.id] : [deliveryDate, order.id]);
