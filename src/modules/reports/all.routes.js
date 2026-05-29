@@ -267,6 +267,8 @@ const userFilter = req.user.role === 'sales'
       COUNT(l.id) AS total_leads,
       SUM(l.status='new') AS new_cnt,SUM(l.status='in_process') AS in_process,
       SUM(l.status='follow_up') AS follow_up,
+      SUM(l.status='cnr') AS cnr,
+      SUM(l.status='dead') AS dead
       SUM(l.status IN ('converted','delivered')) AS converted,
       SUM(l.status='delivered') AS delivered,
       SUM(l.status='closed_lost') AS closed_lost,
