@@ -121,7 +121,7 @@ router.patch('/:customerId/orders/:orderId/cancel', async (req, res, next) => {
     }
 
     res.json({ success: true, message: 'Order cancelled.' });
-  } catch(err) { next(err); }
+  } catch(err) { console.log("ERROR:", err); next(err); }
 });
 
 module.exports = router;
