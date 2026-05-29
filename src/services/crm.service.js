@@ -287,14 +287,24 @@ const processOrderDelivered = async (leadId, deliveryDate, trackingId = null) =>
     // ============================================================
 
     await conn.execute(`
+    //   UPDATE orders
+    //   SET status='delivered',
+    //       delivery_date=?,
+    //       revenue_countable=1,
+    //       ${trackingId ? 'tracking_id=?,' : ''}
+    //       updated_at=NOW()
+    //   WHERE id=?
+    // `, trackingId ? [deliveryDate, trackingId, order.id] : [deliveryDate, order.id]);
+
+    await conn.execute(`
       UPDATE orders
       SET status='delivered',
           delivery_date=?,
           revenue_countable=1,
-          tracking_id   = COALESCE(?, tracking_id),
+          tracking_id = COALESCE(?, tracking_id),
           updated_at=NOW()
       WHERE id=?
-    `, trackingId ? [deliveryDate, trackingId, order.id] : [deliveryDate, order.id]);
+    `, [deliveryDate, trackingId || null, order.id]);
 
     // ============================================================
     // UPDATE CUSTOMER
@@ -350,7 +360,8 @@ const processOrderDelivered = async (leadId, deliveryDate, trackingId = null) =>
       order.id,
       order.product_name,
       order.amount,
-      order.tracking_id || null,
+      // order.tracking_id || null,
+      trackingId || order.tracking_id || null,
       deliveryDate
     ]);
 
