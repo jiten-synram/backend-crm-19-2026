@@ -14,6 +14,7 @@ router.get('/', async (req, res, next) => {
     const pageNum  = parseInt(page)  || 1;
     const offset   = (pageNum - 1) * limitNum;
     let where='1=1'; const p=[];
+    if (!isAdmin(req.user)) { where += ' AND c.assigned_to=?'; p.push(req.user.id); }
     if(search){ where+=' AND (c.name LIKE ? OR c.phone LIKE ?)'; const s=`%${search}%`; p.push(s,s); }
     const [[{total}]] = await Promise.all([query(`SELECT COUNT(*) AS total FROM customers c WHERE ${where}`,p)]);
     const customers = await query(`
