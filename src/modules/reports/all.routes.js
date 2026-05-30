@@ -165,13 +165,15 @@ dashRouter.get('/admin', authorize('admin','sub_admin'), async (req, res, next) 
 dashRouter.get('/user', async (req, res, next) => {
   try {
     const uid=req.user.id;
-    const [kpis,monthly,byStatus,incSummary] = await Promise.all([
+    const [kpis,repCnt,custCnt,monthly,byStatus,incSummary] = await Promise.all([
       query(`SELECT status,COUNT(*) AS cnt,SUM(CASE WHEN revenue_countable=1 THEN COALESCE(order_amount,0) ELSE 0 END) AS revenue FROM leads WHERE assigned_to=? GROUP BY status`,[uid]),
+      query(`SELECT COUNT(*) AS c FROM orders WHERE assigned_to=? AND is_repeat=1`,[uid]),
+      query(`SELECT COUNT(*) AS cus FROM customers WHERE assigned_to=? AND is_active=1`,[uid]),
       query(`SELECT YEAR(delivery_date) AS yr,MONTH(delivery_date) AS mo,SUM(amount) AS revenue,COUNT(*) AS orders FROM orders WHERE assigned_to=? AND revenue_countable=1 AND delivery_date>=DATE_SUB(NOW(),INTERVAL 6 MONTH) GROUP BY yr,mo ORDER BY yr,mo`,[uid]),
       query(`SELECT status,COUNT(*) AS cnt FROM leads WHERE assigned_to=? GROUP BY status`,[uid]),
       query(`SELECT status,SUM(incentive_amount) AS total,COUNT(*) AS cnt FROM incentives WHERE user_id=? GROUP BY status`,[uid]),
     ]);
-    const cards={assigned:0,converted:0,delivered:0,pending:0,total_revenue:0,total: 0,in_process: 0, follow_up: 0,};
+    const cards={assigned:0,converted:0,delivered:0,pending:0,repeat_orders:Number(repCnt[0].c||0),customers: Number(custCnt[0].cus || 0),total_revenue:0,total: 0,in_process: 0, follow_up: 0,};
     kpis.forEach(k=>{cards.assigned+=Number(k.cnt);cards.total    += Number(k.cnt); cards.total_revenue+=Number(k.revenue||0);if(['converted','delivered'].includes(k.status))cards.converted+=Number(k.cnt);if(['new','in_process','follow_up'].includes(k.status))cards.pending+=Number(k.cnt);if(k.status==='delivered')cards.delivered=Number(k.cnt);
       if (k.status === 'in_process') cards.in_process  = Number(k.cnt);  // ← YE
       if (k.status === 'follow_up')  cards.follow_up   = Number(k.cnt);  // ← YE
