@@ -118,6 +118,36 @@ teamRouter.patch('/reset-index/:category', authorize('admin'), async (req, res, 
   } catch(err){ next(err); }
 });
 
+teamRouter.get('/pool-members', async (req, res, next) => {
+  try {
+    const { category } = req.query;
+    const members = await query(`
+      SELECT u.id, u.name, u.email, u.designation
+      FROM user_categories uc
+      JOIN users u ON u.id = uc.user_id
+      WHERE uc.category = ? AND u.is_active = 1
+    `, [category]);
+    res.json({ success: true, members });
+  } catch(err) { next(err); }
+});
+
+// teamRouter mein add karo
+teamRouter.get('/user-categories/:userId', async (req, res, next) => {
+  try {
+    const categories = await query(
+      'SELECT category FROM user_categories WHERE user_id=?',
+      [req.params.userId]
+    );
+
+    res.json({
+      success: true,
+      categories: categories.map(c => c.category)
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ================================================================
 // DASHBOARD
 // ================================================================
