@@ -141,4 +141,15 @@ router.patch('/change-password', protect, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+router.get('/my-categories', protect, async (req, res, next) => {
+  try {
+    const rows = await query(
+      'SELECT category FROM user_categories WHERE user_id=? ORDER BY category',
+      [req.user.id]
+    );
+    res.json({ success: true, categories: rows.map(r => r.category) });
+  } catch(err) { next(err); }
+});
+
 module.exports = router;
