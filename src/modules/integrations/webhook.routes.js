@@ -46,6 +46,16 @@ router.post('/meta-leads', async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'name and phone required' });
     }
 
+    // ✅ Meta campaign_id se CRM campaign dhundho
+    let crmCampaignId = null;
+    if (campaign_id) {
+      const [camp] = await query(
+        'SELECT id FROM campaigns WHERE external_id=?',
+        [String(campaign_id)]
+      );
+      crmCampaignId = camp?.id || null;
+    }
+
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
 
     const CATS = ['Kidney Stone Treatment','Gall Stone Treatment','UTI Treatment','CKD Treatment',
@@ -63,12 +73,12 @@ router.post('/meta-leads', async (req, res, next) => {
 
     const r = await query(`
       INSERT INTO leads (name,phone,email,city,state,source,category,
-                         assigned_to,assigned_at,is_duplicate,duplicate_of,
+                         assigned_to,assigned_at,is_duplicate,duplicate_of,campaign_id,
                          external_id,external_source,created_by)
-      VALUES (?,?,?,?,?,'meta_ads',?,?,?,?,?,?,?,NULL)
+      VALUES (?,?,?,?,?,'meta_ads',?,?,?,?,?,?,?,?,NULL)
     `, [name.trim(), cleanPhone, email?.toLowerCase()||null, city||null, state||null,
         mappedCat, assignedTo, assignedTo?new Date():null,
-        dup?1:0, dup?.id||null,
+        dup?1:0, dup?.id||null,crmCampaignId,
         req.body.form_id||req.body.lead_id||null, 'meta']);
 
     const leadId = r.insertId;
