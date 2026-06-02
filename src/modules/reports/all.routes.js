@@ -456,4 +456,13 @@ ordersRouter.get('/export', async (req, res, next) => {
   } catch(err) { next(err); }
 });
 
+repRouter.get('/campaigns-list', async (req, res, next) => {
+  try {
+    const campaigns = await query(
+      'SELECT id, name, platform, status FROM campaigns ORDER BY name ASC'
+    );
+    res.json({ success: true, campaigns });
+  } catch(err) { next(err); }
+});
+
 module.exports = { ordersRouter, teamRouter, dashRouter, repRouter };
