@@ -162,6 +162,10 @@ router.post('/', async (req, res, next) => {
     if (manualAssign && isAdmin(req.user)) {
       assignedTo = await assignManual(manualAssign);
       isManual   = 1;
+    } else if (!isAdmin(req.user)) {
+      // ✅ Sales user — khud ko assign karo
+      assignedTo = req.user.id;
+      isManual   = 1;
     } else {
       assignedTo = await assignRoundRobin(category).catch(() => null);
     }
