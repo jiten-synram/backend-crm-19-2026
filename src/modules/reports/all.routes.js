@@ -80,7 +80,7 @@ ordersRouter.patch('/:id/tracking', async (req, res, next) => {
     if (status === 'delivered' && delivery_date) {
       const { processOrderDelivered } = require('../../services/crm.service');
       const [order] = await query('SELECT lead_id FROM orders WHERE id=?', [req.params.id]);
-      if (order?.lead_id) await processOrderDelivered(order.lead_id, delivery_date);
+      if (order?.lead_id) await processOrderDelivered(order.lead_id, delivery_date, order.tracking_id);
     }
 
     const [updated] = await query('SELECT * FROM orders WHERE id=?', [req.params.id]);
