@@ -418,10 +418,81 @@ const processOrderDelivered = async (leadId, deliveryDate, trackingId = null) =>
   });
 };
 
+const processOrderCancelled = async (orderId, cancelledDate, trackingId = null) => {
+
+  return withTransaction(async (conn) => {
+
+    // ============================================================
+    // GET ORDER
+    // ============================================================
+    
+    const [[order]] = await conn.execute(`
+      SELECT *
+      FROM orders
+      WHERE id=?
+      ORDER BY id DESC
+      LIMIT 1
+    `, [orderId]);
+
+    if (!order) return;
+    
+    if (order.status === 'cancelled') return;
+    
+    // ============================================================
+    // UPDATE ORDER
+    // ============================================================
+
+    await conn.execute(`
+      UPDATE orders
+      SET status='cancelled',
+          cancelled_date=?,
+          revenue_countable=0,
+          tracking_id = COALESCE(?, tracking_id),
+          updated_at=NOW()
+      WHERE id=?
+    `, [cancelledDate, trackingId || null, order.id]);
+
+    
+
+    // ============================================================
+    // PURCHASE HISTORY
+    // ============================================================
+
+    await conn.execute(`
+      INSERT INTO purchases (
+        customer_id,
+        lead_id,
+        order_id,
+        product_name,
+        amount,
+        tracking_id,
+        order_date,
+        source,
+        status
+      )
+      VALUES (
+        ?,?,?,?,?,?,?,
+        'crm',
+        'cancelled'
+      )
+    `, [
+      order.customer_id,
+      order.lead_id || null,
+      order.id,
+      order.product_name,
+      order.amount,
+      // order.tracking_id || null,
+      trackingId || order.tracking_id || null,
+      order.order_date
+    ]);
+  });
+};
+
 module.exports = {
   assignRoundRobin,
   assignManual,
   findCustomerByFingerprint,
   processConverted,
   processOrderDelivered,
+  processOrderCancelled,
 };
