@@ -46,31 +46,50 @@ router.get('/:id', async (req, res, next) => {
   } catch(err){ next(err); }
 });
 
+// router.post('/:id/reorder', async (req, res, next) => {
+//   try {
+//     const { product_name, amount, tracking_id, payment_status, shipping_address, remark, order_date, delivery_date } = req.body;
+//     if(!product_name||!amount) throw new AppError('product_name and amount required.');
+//     const [c] = await query('SELECT * FROM customers WHERE id=?',[req.params.id]);
+//     if(!c) throw new AppError('Customer not found.',404);
+
+//     const r = await query(`
+//       INSERT INTO orders (lead_id,customer_id,assigned_to,product_name,amount,tracking_id,payment_status, shipping_address, remark,
+//                           order_date,delivery_date,status,revenue_countable,is_repeat,source,created_by)
+//       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,'crm',?)
+//     `,[c.first_lead_id||null,c.id,req.user.id,product_name,Number(amount),tracking_id||null,payment_status || null, shipping_address || null, remark || null,
+//        order_date||new Date(),delivery_date||null,delivery_date?'delivered':'pending',delivery_date?1:0,req.user.id]);
+
+//     await query(`INSERT INTO purchases (customer_id,order_id,product_name,amount,tracking_id,order_date,delivery_date,source,status) VALUES (?,?,?,?,?,?,?,'crm',?)`,
+//       [c.id,r.insertId,product_name,Number(amount),tracking_id||null,
+//        (order_date||new Date()).toString().split('T')[0],
+//        delivery_date||(null),delivery_date?'delivered':'pending']);
+
+//     if(delivery_date){
+//       await query(`UPDATE customers SET total_orders=total_orders+1,
+//         total_revenue=total_revenue+?,lifetime_value=lifetime_value+?,
+//         avg_order_value=(total_revenue+?)/(total_orders+1),last_purchase=? WHERE id=?`,
+//         [Number(amount),Number(amount),Number(amount),delivery_date,c.id]);
+//     }
+//     res.status(201).json({ success:true, orderId:r.insertId });
+//   } catch(err){ next(err); }
+// });
 router.post('/:id/reorder', async (req, res, next) => {
   try {
-    const { product_name, amount, tracking_id, payment_status, shipping_address, remark, order_date, delivery_date } = req.body;
+    // const { product_name, amount, tracking_id, payment_status, shipping_address, remark, order_date, delivery_date } = req.body;
+    const { product_name, amount, tracking_id, payment_status, shipping_address, remark, order_date, dispatched_date } = req.body;
     if(!product_name||!amount) throw new AppError('product_name and amount required.');
     const [c] = await query('SELECT * FROM customers WHERE id=?',[req.params.id]);
     if(!c) throw new AppError('Customer not found.',404);
 
     const r = await query(`
       INSERT INTO orders (lead_id,customer_id,assigned_to,product_name,amount,tracking_id,payment_status, shipping_address, remark,
-                          order_date,delivery_date,status,revenue_countable,is_repeat,source,created_by)
+                          order_date,dispatch_date,status,revenue_countable,is_repeat,source,created_by)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,'crm',?)
     `,[c.first_lead_id||null,c.id,req.user.id,product_name,Number(amount),tracking_id||null,payment_status || null, shipping_address || null, remark || null,
-       order_date||new Date(),delivery_date||null,delivery_date?'delivered':'pending',delivery_date?1:0,req.user.id]);
+       order_date||new Date(),dispatched_date||null,dispatched_date?'dispatched':'pending',dispatched_date?1:0,req.user.id]);
 
-    await query(`INSERT INTO purchases (customer_id,order_id,product_name,amount,tracking_id,order_date,delivery_date,source,status) VALUES (?,?,?,?,?,?,?,'crm',?)`,
-      [c.id,r.insertId,product_name,Number(amount),tracking_id||null,
-       (order_date||new Date()).toString().split('T')[0],
-       delivery_date||(null),delivery_date?'delivered':'pending']);
-
-    if(delivery_date){
-      await query(`UPDATE customers SET total_orders=total_orders+1,
-        total_revenue=total_revenue+?,lifetime_value=lifetime_value+?,
-        avg_order_value=(total_revenue+?)/(total_orders+1),last_purchase=? WHERE id=?`,
-        [Number(amount),Number(amount),Number(amount),delivery_date,c.id]);
-    }
+    
     res.status(201).json({ success:true, orderId:r.insertId });
   } catch(err){ next(err); }
 });
