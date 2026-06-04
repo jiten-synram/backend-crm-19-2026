@@ -145,4 +145,32 @@ router.patch('/:customerId/orders/:orderId/cancel', async (req, res, next) => {
   } catch(err) { console.log("ERROR:", err); next(err); }
 });
 
+// PATCH /api/customers/:id — customer details update
+router.patch('/:id', async (req, res, next) => {
+  try {
+    const allowed = ['name', 'phone', 'alt_phone', 'email', 'city', 'state', 'shipping_address'];
+    const sets = []; const vals = [];
+
+    allowed.forEach(f => {
+      if (req.body[f] !== undefined) {
+        sets.push(`${f}=?`);
+        vals.push(req.body[f] || null);
+      }
+    });
+
+    if (!sets.length) throw new AppError('No fields to update.');
+
+    sets.push('updated_at=NOW()');
+    vals.push(req.params.id);
+
+    await query(`UPDATE customers SET ${sets.join(',')} WHERE id=?`, vals);
+
+    const [updated] = await query(
+      'SELECT c.*, u.name AS agent_name FROM customers c LEFT JOIN users u ON u.id=c.assigned_to WHERE c.id=?',
+      [req.params.id]
+    );
+    res.json({ success: true, customer: updated });
+  } catch(err) { next(err); }
+});
+
 module.exports = router;
