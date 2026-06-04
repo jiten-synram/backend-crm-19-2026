@@ -410,6 +410,7 @@ const processOrderDelivered = async (leadId, deliveryDate, trackingId = null) =>
     await conn.execute(`
       UPDATE leads
       SET delivery_date=?,
+          status="delivered",
           updated_at=NOW()
       WHERE id=?
     `, [deliveryDate, leadId]);
