@@ -38,21 +38,38 @@ ordersRouter.get('/', async (req, res, next) => {
 
 ordersRouter.patch('/:id/tracking', async (req, res, next) => {
   try {
-    const { status, tracking_id, courier, dispatch_date, delivery_date, cancelled_date } = req.body;
+    const { status, tracking_id, courier, dispatch_date, delivery_date, cancelled_date, remark } = req.body;
 
     const sets = []; const vals = [];
 
     if (tracking_id  !== undefined) { sets.push('tracking_id=?');   vals.push(tracking_id || null); }
     if (courier      !== undefined) { sets.push('courier=?');        vals.push(courier || null); }
+    if (remark         !== undefined) { sets.push('remark=?');          vals.push(remark         || null); } // ✅
     if (dispatch_date)              { sets.push('dispatch_date=?');  vals.push(dispatch_date); }
     if (delivery_date)              { sets.push('delivery_date=?');  vals.push(delivery_date); }
     if (cancelled_date)             { sets.push('cancelled_date=?'); vals.push(cancelled_date); }
 
+    // if (status) {
+    //   sets.push('status=?'); vals.push(status);
+    //   if (status === 'delivered')  { sets.push('revenue_countable=?'); vals.push(1); }
+    //   if (status === 'cancelled')  { sets.push('revenue_countable=?'); vals.push(0); }
+    // }
     if (status) {
-      sets.push('status=?'); vals.push(status);
-      if (status === 'delivered')  { sets.push('revenue_countable=?'); vals.push(1); }
-      if (status === 'cancelled')  { sets.push('revenue_countable=?'); vals.push(0); }
-    }
+        let orderStatus = status;
+
+        if (status === 'delivered') {
+          orderStatus = 'dispatched';
+        }
+        if (status === 'cancelled') {
+          orderStatus = 'cancelled';
+        }
+
+        sets.push('status=?');
+        vals.push(orderStatus);
+      }
+
+    sets.push('updated_at=NOW()');
+    vals.push(req.params.id);
 
     sets.push('updated_at=NOW()');
     vals.push(req.params.id);
