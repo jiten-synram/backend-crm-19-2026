@@ -428,7 +428,7 @@ repRouter.get('/export', async (req, res, next) => {
 
 ordersRouter.get('/export', async (req, res, next) => {
   try {
-    const { format = 'excel', status, payment_status } = req.query;
+    const { format = 'excel', status, payment_status, date_from, date_to } = req.query;
     let where = '1=1'; const p = [];
     if (!isAdmin(req.user)) { where += ' AND o.assigned_to=?'; p.push(req.user.id); }
     if (status)         { where += ' AND o.status=?';          p.push(status); }
