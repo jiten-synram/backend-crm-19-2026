@@ -7,7 +7,7 @@ const { protect, authorize, AppError } = require('../../middleware/auth');
 
 const router = express.Router();
 
-const signAccess  = id => jwt.sign({ id }, process.env.JWT_SECRET,         { expiresIn: process.env.JWT_EXPIRES_IN || '15m' });
+const signAccess  = id => jwt.sign({ id }, process.env.JWT_SECRET,         { expiresIn: process.env.JWT_EXPIRES_IN || '12h' });
 const signRefresh = id => jwt.sign({ id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '30d' });
 
 // ── POST /api/auth/login ───────────────────────────────────────
