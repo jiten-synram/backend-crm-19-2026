@@ -25,6 +25,8 @@ ordersRouter.get('/', async (req, res, next) => {
   p.push(req.query.payment_status);
 }
     if(req.query.is_repeat){ where+=' AND o.is_repeat=?'; p.push(req.query.is_repeat==='true'?1:0); }
+    if(req.query.date_from){ where+=' AND o.order_date >= ?'; p.push(req.query.date_from); }  
+    if(req.query.date_to)  { where+=' AND o.order_date <= ?'; p.push(req.query.date_to); }
     const [[{total}]] = await Promise.all([query(`SELECT COUNT(*) AS total FROM orders o WHERE ${where}`,p)]);
     const orders = await query(`SELECT o.*,l.name AS lead_name,l.phone AS lead_phone,
       c.name AS customer_name,u.name AS agent_name
@@ -61,7 +63,7 @@ ordersRouter.patch('/:id/tracking', async (req, res, next) => {
           orderStatus = 'dispatched';
         }
         if (status === 'cancelled') {
-          orderStatus = 'cancelled';
+          orderStatus = 'delivered';
         }
 
         sets.push('status=?');
@@ -81,6 +83,13 @@ ordersRouter.patch('/:id/tracking', async (req, res, next) => {
       const { processOrderDelivered } = require('../../services/crm.service');
       const [order] = await query('SELECT lead_id FROM orders WHERE id=?', [req.params.id]);
       if (order?.lead_id) await processOrderDelivered(order.lead_id, delivery_date, order.tracking_id);
+    }
+
+    // Cancelled hone par customer stats update karo
+    if (status === 'cancelled' && cancelled_date) {
+      const { processOrderCancelled } = require('../../services/crm.service');
+      const [order] = await query('SELECT id, tracking_id FROM orders WHERE id=?', [req.params.id]);
+      if (order?.id) await processOrderCancelled(order.id, cancelled_date, order.tracking_id);
     }
 
     const [updated] = await query('SELECT * FROM orders WHERE id=?', [req.params.id]);
@@ -424,6 +433,8 @@ ordersRouter.get('/export', async (req, res, next) => {
     if (!isAdmin(req.user)) { where += ' AND o.assigned_to=?'; p.push(req.user.id); }
     if (status)         { where += ' AND o.status=?';          p.push(status); }
     if (payment_status) { where += ' AND o.payment_status=?';  p.push(payment_status); }
+    if (date_from)      { where += ' AND o.order_date >= ?';  p.push(date_from); } 
+    if (date_to)        { where += ' AND o.order_date <= ?';  p.push(date_to); }  
 
     const orders = await query(`
       SELECT o.*, l.name AS lead_name, l.phone AS lead_phone,
