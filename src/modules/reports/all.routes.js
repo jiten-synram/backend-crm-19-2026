@@ -231,7 +231,7 @@ dashRouter.get('/user', async (req, res, next) => {
       query(`SELECT status,SUM(incentive_amount) AS total,COUNT(*) AS cnt FROM incentives WHERE user_id=? GROUP BY status`,[uid]),
     ]);
     const cards={assigned:0,converted:0,delivered:0,pending:0,repeat_orders:Number(repCnt[0].c||0),customers: Number(custCnt[0].cus || 0),total_revenue:0,total: 0,in_process: 0, follow_up: 0,};
-    kpis.forEach(k=>{cards.assigned+=Number(k.cnt);cards.total    += Number(k.cnt); cards.total_revenue+=Number(k.revenue||0);if(['converted','delivered'].includes(k.status))cards.converted+=Number(k.cnt);if(['new','in_process','follow_up'].includes(k.status))cards.pending+=Number(k.cnt);if(k.status==='delivered')cards.delivered=Number(k.cnt);
+    kpis.forEach(k=>{cards.assigned+=Number(k.cnt);cards.total    += Number(k.cnt); cards.total_revenue+=Number(k.revenue||0);if(['converted'].includes(k.status))cards.converted+=Number(k.cnt);if(['new','in_process','follow_up'].includes(k.status))cards.pending+=Number(k.cnt);if(k.status==='delivered')cards.delivered=Number(k.cnt);
       if (k.status === 'in_process') cards.in_process  = Number(k.cnt);  // ← YE
       if (k.status === 'follow_up')  cards.follow_up   = Number(k.cnt);  // ← YE
       if (k.status === 'new')        cards.new          = Number(k.cnt);  // ← YE
