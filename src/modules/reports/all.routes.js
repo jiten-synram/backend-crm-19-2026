@@ -706,55 +706,121 @@ repRouter.get('/export-combined', async (req, res, next) => {
     const rows = [...leadRows, ...reorderRows];
 
     // CSV
-    if (format === 'csv') {
-      if (!rows.length) { res.setHeader('Content-Type', 'text/csv'); return res.send('No data'); }
-      const parser = new Parser({ fields: Object.keys(rows[0]) });
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="combined-report-${Date.now()}.csv"`);
-      return res.send(parser.parse(rows));
-    }
+if (format === 'csv') {
+  if (!rows.length) {
+    res.setHeader('Content-Type', 'text/csv');
+    return res.send('No data');
+  }
 
-    // Excel
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('Leads & Reorders');
+  const parser = new Parser({ fields: Object.keys(rows[0]) });
 
-    if (rows.length) {
-      ws.columns = Object.keys(rows[0]).map(k => ({
-        header: k, key: k,
-        width: ['Name','Product','Remark','Assigned To','Campaign'].includes(k) ? 24 : 16,
-      }));
-      ws.getRow(1).font   = { bold: true, color: { argb: 'FFFFFFFF' } };
-      ws.getRow(1).fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF162B20' } };
-      ws.getRow(1).height = 20;
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="combined-report-${Date.now()}.csv"`
+  );
 
-      rows.forEach((r, i) => {
-        const row       = ws.addRow(r);
-        const isReorder = r['Type'] === 'Reorder';
-        row.eachCell(c => {
-          c.fill = { type: 'pattern', pattern: 'solid',
-            fgColor: { argb: isReorder
-              ? (i % 2 === 0 ? 'FFFFF8ED' : 'FFFEF3C7')
-              : (i % 2 === 0 ? 'FFF0F5F3' : 'FFFFFFFF') },
-          };
-        });
-        const typeCell = row.getCell('Type');
-        typeCell.font  = { bold: true, color: { argb: isReorder ? 'FFB45309' : 'FF166534' } };
-      });
+  return res.send(parser.parse(rows));
+}
 
-      ws.addRow([]);
-      const sumRow = ws.addRow({
-        Type:   `Total: ${rows.length}  |  Leads: ${leadRows.length}  |  Reorders: ${reorderRows.length}`,
-        Amount: rows.reduce((s, r) => s + (Number(r['Amount']) || 0), 0),
-      });
-      sumRow.font = { bold: true };
-    } else {
-      ws.addRow(['No data found']);
-    }
+// Excel
+const wb = new ExcelJS.Workbook();
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="combined-report-${Date.now()}.xlsx"`);
-    await wb.xlsx.write(res);
-    res.end();
+// Split data by status
+const deliveredRows = rows.filter(
+  r => String(r.Status || '').toLowerCase() === 'delivered'
+);
+
+const otherRows = rows.filter(
+  r => String(r.Status || '').toLowerCase() !== 'delivered'
+);
+
+// Create sheets
+const deliveredSheet = wb.addWorksheet('Delivered');
+const otherSheet = wb.addWorksheet('Other Status');
+
+function fillSheet(ws, dataRows) {
+  if (!dataRows.length) {
+    ws.addRow(['No data found']);
+    return;
+  }
+
+  ws.columns = Object.keys(dataRows[0]).map(k => ({
+    header: k,
+    key: k,
+    width: ['Name', 'Product', 'Remark', 'Assigned To', 'Campaign'].includes(k)
+      ? 24
+      : 16,
+  }));
+
+  // Header style
+  ws.getRow(1).font = {
+    bold: true,
+    color: { argb: 'FFFFFFFF' }
+  };
+
+  ws.getRow(1).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF162B20' }
+  };
+
+  ws.getRow(1).height = 20;
+
+  // Data rows
+  dataRows.forEach((r, i) => {
+    const row = ws.addRow(r);
+
+    row.eachCell(cell => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: {
+          argb: i % 2 === 0
+            ? 'FFF8FAFC'
+            : 'FFFFFFFF'
+        }
+      };
+    });
+  });
+
+  // Summary Row
+  ws.addRow([]);
+
+  const totalAmount = dataRows.reduce(
+    (sum, r) => sum + Number(r.Amount || 0),
+    0
+  );
+
+  const summaryRow = ws.addRow({
+    Type: `Total Records: ${dataRows.length}`,
+    Amount: totalAmount
+  });
+
+  summaryRow.font = { bold: true };
+
+  ws.columns.forEach(col => {
+    if (col.width < 16) col.width = 16;
+  });
+}
+
+// Fill both sheets
+fillSheet(deliveredSheet, deliveredRows);
+fillSheet(otherSheet, otherRows);
+
+// Download
+res.setHeader(
+  'Content-Type',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+);
+
+res.setHeader(
+  'Content-Disposition',
+  `attachment; filename="combined-report-${Date.now()}.xlsx"`
+);
+
+await wb.xlsx.write(res);
+res.end();
 
   } catch(err) { next(err); }
 });
