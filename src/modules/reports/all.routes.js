@@ -288,7 +288,7 @@ dashRouter.get('/user', async (req, res, next) => {
     kpis.forEach(k => {
       cards.total    += Number(k.cnt);
       cards.assigned += Number(k.cnt);
-      if (['converted', 'delivered'].includes(k.status)) cards.converted  += Number(k.cnt);
+      if (['converted'].includes(k.status)) cards.converted  += Number(k.cnt);
       if (['new','in_process','follow_up'].includes(k.status)) cards.pending += Number(k.cnt);
       if (k.status === 'delivered')  cards.delivered  = Number(k.cnt);
       if (k.status === 'in_process') cards.in_process = Number(k.cnt);
