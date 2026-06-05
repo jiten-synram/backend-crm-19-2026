@@ -389,27 +389,70 @@ repRouter.get('/revenue', async (req, res, next) => {
   } catch(err){ next(err); }
 });
 
+// repRouter.get('/team-performance', async (req, res, next) => {
+//   try {
+//     const assignedTo = req.query.assigned_to ? Number(req.query.assigned_to) : null;
+// const userFilter = req.user.role === 'sales' 
+//   ? `AND u.id = ${req.user.id}` 
+//   : (assignedTo ? `AND u.id = ${assignedTo}` : '');
+//     const performance=await query(`SELECT u.id,u.name,u.email,
+//       COUNT(l.id) AS total_leads,
+//       SUM(l.status='new') AS new_cnt,SUM(l.status='in_process') AS in_process,
+//       SUM(l.status='follow_up') AS follow_up,
+//       SUM(l.status='cnr') AS cnr,
+//       SUM(l.status='dead') AS dead,
+//       SUM(l.status IN ('converted')) AS converted,
+//       SUM(l.status='delivered') AS delivered,
+//       SUM(l.status='closed_lost') AS closed_lost,
+//       SUM(CASE WHEN l.revenue_countable=1 THEN COALESCE(l.order_amount,0) ELSE 0 END) AS revenue,
+//       ROUND(SUM(l.status IN ('converted','delivered'))/NULLIF(COUNT(l.id),0)*100,1) AS conversion_rate
+//       FROM users u LEFT JOIN leads l ON l.assigned_to=u.id
+//       WHERE u.role='sales' ${userFilter} GROUP BY u.id,u.name,u.email ORDER BY revenue DESC`);
+//     res.json({ success:true, performance });
+//   } catch(err){ next(err); }
+// });
+
 repRouter.get('/team-performance', async (req, res, next) => {
   try {
     const assignedTo = req.query.assigned_to ? Number(req.query.assigned_to) : null;
-const userFilter = req.user.role === 'sales' 
-  ? `AND u.id = ${req.user.id}` 
-  : (assignedTo ? `AND u.id = ${assignedTo}` : '');
-    const performance=await query(`SELECT u.id,u.name,u.email,
-      COUNT(l.id) AS total_leads,
-      SUM(l.status='new') AS new_cnt,SUM(l.status='in_process') AS in_process,
-      SUM(l.status='follow_up') AS follow_up,
-      SUM(l.status='cnr') AS cnr,
-      SUM(l.status='dead') AS dead,
-      SUM(l.status IN ('converted','delivered')) AS converted,
-      SUM(l.status='delivered') AS delivered,
-      SUM(l.status='closed_lost') AS closed_lost,
-      SUM(CASE WHEN l.revenue_countable=1 THEN COALESCE(l.order_amount,0) ELSE 0 END) AS revenue,
-      ROUND(SUM(l.status IN ('converted','delivered'))/NULLIF(COUNT(l.id),0)*100,1) AS conversion_rate
-      FROM users u LEFT JOIN leads l ON l.assigned_to=u.id
-      WHERE u.role='sales' ${userFilter} GROUP BY u.id,u.name,u.email ORDER BY revenue DESC`);
-    res.json({ success:true, performance });
-  } catch(err){ next(err); }
+    const userFilter = req.user.role === 'sales'
+      ? `AND u.id = ${req.user.id}`
+      : (assignedTo ? `AND u.id = ${assignedTo}` : '');
+
+    const performance = await query(`
+      SELECT 
+        u.id, u.name, u.email,
+        COUNT(DISTINCT l.id)                                                        AS total_leads,
+        SUM(l.status='new')                                                         AS new_cnt,
+        SUM(l.status='in_process')                                                  AS in_process,
+        SUM(l.status='follow_up')                                                   AS follow_up,
+        SUM(l.status='cnr')                                                         AS cnr,
+        SUM(l.status='dead')                                                        AS dead,
+        SUM(l.status='converted')                                                   AS converted,
+        SUM(l.status='delivered')                                                   AS delivered,
+        SUM(l.status='cancelled')                                                   AS cancelled,
+
+        -- ✅ Reorder count — delivered reorders jo is agent ne kiye
+        COUNT(DISTINCT CASE WHEN o.is_repeat=1 AND o.status='delivered' THEN o.id END) AS reorder_count,
+
+        -- ✅ Total revenue — delivered orders (lead + reorder dono) orders table se
+        COALESCE(SUM(CASE WHEN o.revenue_countable=1 THEN o.amount ELSE 0 END), 0) AS revenue,
+
+        -- ✅ Reorder revenue alag se
+        COALESCE(SUM(CASE WHEN o.is_repeat=1 AND o.revenue_countable=1 THEN o.amount ELSE 0 END), 0) AS reorder_revenue,
+
+        ROUND(SUM(l.status IN ('converted','delivered')) / NULLIF(COUNT(DISTINCT l.id), 0) * 100, 1) AS conversion_rate
+
+      FROM users u
+      LEFT JOIN leads l  ON l.assigned_to = u.id
+      LEFT JOIN orders o ON o.assigned_to = u.id AND o.status != 'cancelled'
+      WHERE u.role='sales' ${userFilter}
+      GROUP BY u.id, u.name, u.email
+      ORDER BY revenue DESC
+    `);
+
+    res.json({ success: true, performance });
+  } catch(err) { next(err); }
 });
 
 repRouter.get('/campaign-performance', async (req, res, next) => {
