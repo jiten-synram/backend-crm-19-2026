@@ -420,35 +420,56 @@ repRouter.get('/team-performance', async (req, res, next) => {
       : (assignedTo ? `AND u.id = ${assignedTo}` : '');
 
     const performance = await query(`
-      SELECT 
+      SELECT
         u.id, u.name, u.email,
-        COUNT(DISTINCT l.id)                                                        AS total_leads,
-        SUM(l.status='new')                                                         AS new_cnt,
-        SUM(l.status='in_process')                                                  AS in_process,
-        SUM(l.status='follow_up')                                                   AS follow_up,
-        SUM(l.status='cnr')                                                         AS cnr,
-        SUM(l.status='dead')                                                        AS dead,
-        SUM(l.status='converted')                                                   AS converted,
-        SUM(l.status='delivered')                                                   AS delivered,
-        SUM(l.status='cancelled')                                                   AS cancelled,
 
-        -- ✅ Reorder count — delivered reorders jo is agent ne kiye
-        COUNT(DISTINCT CASE WHEN o.is_repeat=1 AND o.status='delivered' THEN o.id END) AS reorder_count,
+        COALESCE(ls.total_leads,     0) AS total_leads,
+        COALESCE(ls.new_cnt,         0) AS new_cnt,
+        COALESCE(ls.in_process,      0) AS in_process,
+        COALESCE(ls.follow_up,       0) AS follow_up,
+        COALESCE(ls.cnr,             0) AS cnr,
+        COALESCE(ls.dead,            0) AS dead,
+        COALESCE(ls.converted,       0) AS converted,
+        COALESCE(ls.delivered,       0) AS delivered,
+        COALESCE(ls.cancelled,       0) AS cancelled,
+        COALESCE(ls.conversion_rate, 0) AS conversion_rate,
 
-        -- ✅ Total revenue — delivered orders (lead + reorder dono) orders table se
-        COALESCE(SUM(CASE WHEN o.revenue_countable=1 THEN o.amount ELSE 0 END), 0) AS revenue,
-
-        -- ✅ Reorder revenue alag se
-        COALESCE(SUM(CASE WHEN o.is_repeat=1 AND o.revenue_countable=1 THEN o.amount ELSE 0 END), 0) AS reorder_revenue,
-
-        ROUND(SUM(l.status IN ('converted','delivered')) / NULLIF(COUNT(DISTINCT l.id), 0) * 100, 1) AS conversion_rate
+        COALESCE(os.reorder_count,   0) AS reorder_count,
+        COALESCE(os.revenue,         0) AS revenue,
+        COALESCE(os.reorder_revenue, 0) AS reorder_revenue
 
       FROM users u
-      LEFT JOIN leads l  ON l.assigned_to = u.id
-      LEFT JOIN orders o ON o.assigned_to = u.id AND o.status != 'cancelled'
+
+      LEFT JOIN (
+        SELECT
+          assigned_to,
+          COUNT(*)                                                                    AS total_leads,
+          SUM(status='new')                                                           AS new_cnt,
+          SUM(status='in_process')                                                    AS in_process,
+          SUM(status='follow_up')                                                     AS follow_up,
+          SUM(status='cnr')                                                           AS cnr,
+          SUM(status='dead')                                                          AS dead,
+          SUM(status='converted')                                                     AS converted,
+          SUM(status='delivered')                                                     AS delivered,
+          SUM(status='cancelled')                                                     AS cancelled,
+          ROUND(SUM(status IN ('converted','delivered')) / NULLIF(COUNT(*),0)*100, 1) AS conversion_rate
+        FROM leads
+        GROUP BY assigned_to
+      ) ls ON ls.assigned_to = u.id
+
+      LEFT JOIN (
+        SELECT
+          assigned_to,
+          COUNT(CASE WHEN is_repeat=1 AND status='delivered' THEN id END)             AS reorder_count,
+          SUM(CASE WHEN revenue_countable=1 THEN amount ELSE 0 END)                   AS revenue,
+          SUM(CASE WHEN is_repeat=1 AND revenue_countable=1 THEN amount ELSE 0 END)   AS reorder_revenue
+        FROM orders
+        WHERE status != 'cancelled'
+        GROUP BY assigned_to
+      ) os ON os.assigned_to = u.id
+
       WHERE u.role='sales' ${userFilter}
-      GROUP BY u.id, u.name, u.email
-      ORDER BY revenue DESC
+      ORDER BY COALESCE(os.revenue, 0) DESC
     `);
 
     res.json({ success: true, performance });
