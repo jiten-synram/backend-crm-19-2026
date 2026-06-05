@@ -218,35 +218,108 @@ dashRouter.get('/admin', authorize('admin','sub_admin'), async (req, res, next) 
   } catch(err){ next(err); }
 });
 
+// dashRouter.get('/user', async (req, res, next) => {
+//   try {
+//     const uid=req.user.id;
+//     const [kpis,repCnt,custCnt,monthly,byStatus,incSummary] = await Promise.all([
+//       // query(`SELECT status,COUNT(*) AS cnt,SUM(CASE WHEN revenue_countable=1 THEN COALESCE(order_amount,0) ELSE 0 END) AS revenue FROM leads WHERE assigned_to=? GROUP BY status`,[uid]),
+//       query(`SELECT s.status, COUNT(l.id) AS cnt, COALESCE(SUM(CASE WHEN o.revenue_countable = 1 THEN COALESCE(o.amount, 0) ELSE 0 END), 0 ) AS revenue FROM ( SELECT 'new' AS status UNION ALL SELECT 'in_process' UNION ALL SELECT 'follow_up' UNION ALL SELECT 'cnr' UNION ALL SELECT 'converted' UNION ALL SELECT 'delivered' UNION ALL SELECT 'cancelled' UNION ALL SELECT 'dead') s LEFT JOIN leads l ON l.status = s.status AND l.assigned_to = ? LEFT JOIN orders o ON o.assigned_to = l.assigned_to AND o.revenue_countable = 1 and o.status='delivered' GROUP BY s.status ORDER BY FIELD(s.status, 'new', 'in_process', 'follow_up', 'cnr', 'converted', 'delivered', 'cancelled', 'dead')`,[uid]),
+//       query(`SELECT COUNT(*) AS c FROM orders WHERE assigned_to=? AND is_repeat=1`,[uid]),
+//       query(`SELECT COUNT(*) AS cus FROM customers WHERE assigned_to=? AND is_active=1`,[uid]),
+//       query(`SELECT YEAR(delivery_date) AS yr,MONTH(delivery_date) AS mo,SUM(amount) AS revenue,COUNT(*) AS orders FROM orders WHERE assigned_to=? AND revenue_countable=1 AND delivery_date>=DATE_SUB(NOW(),INTERVAL 6 MONTH) GROUP BY yr,mo ORDER BY yr,mo`,[uid]),
+//       query(`SELECT status,COUNT(*) AS cnt FROM leads WHERE assigned_to=? GROUP BY status`,[uid]),
+//       query(`SELECT status,SUM(incentive_amount) AS total,COUNT(*) AS cnt FROM incentives WHERE user_id=? GROUP BY status`,[uid]),
+//     ]);
+//     const cards={assigned:0,converted:0,delivered:0,pending:0,repeat_orders:Number(repCnt[0].c||0),customers: Number(custCnt[0].cus || 0),total_revenue:0,total: 0,in_process: 0, follow_up: 0,};
+//     kpis.forEach(k=>{cards.assigned+=Number(k.cnt);cards.total    += Number(k.cnt); cards.total_revenue+=Number(k.revenue||0);if(['converted'].includes(k.status))cards.converted+=Number(k.cnt);if(['new','in_process','follow_up'].includes(k.status))cards.pending+=Number(k.cnt);if(k.status==='delivered')cards.delivered=Number(k.cnt);
+//       if (k.status === 'in_process') cards.in_process  = Number(k.cnt);  // ← YE
+//       if (k.status === 'follow_up')  cards.follow_up   = Number(k.cnt);  // ← YE
+//       if (k.status === 'new')        cards.new          = Number(k.cnt);  // ← YE
+//     });
+//     const inc={pending:0,approved:0,paid:0};
+//     incSummary.forEach(i=>{inc[i.status]=Number(i.total||0);});
+
+//     const n=new Date();const s=new Date(n);s.setHours(0,0,0,0);const e=new Date(n);e.setHours(23,59,59,999);
+//     const [[ov],[td],[up]] = await Promise.all([
+//       query(`SELECT COUNT(*) AS c FROM leads WHERE assigned_to=? AND status='follow_up' AND next_followup_at<?`,[uid,s]),
+//       query(`SELECT COUNT(*) AS c FROM leads WHERE assigned_to=? AND status='follow_up' AND next_followup_at BETWEEN ? AND ?`,[uid,s,e]),
+//       query(`SELECT COUNT(*) AS c FROM leads WHERE assigned_to=? AND status='follow_up' AND next_followup_at>?`,[uid,e]),
+//     ]);
+//     res.json({ success:true, cards, monthlyGraph:monthly, byStatus, incentiveSummary:inc, followUps:{overdue:Number(ov.c),today:Number(td.c),upcoming:Number(up.c)} });
+//   } catch(err){ next(err); }
+// });
+
 dashRouter.get('/user', async (req, res, next) => {
   try {
-    const uid=req.user.id;
-    const [kpis,repCnt,custCnt,monthly,byStatus,incSummary] = await Promise.all([
-      // query(`SELECT status,COUNT(*) AS cnt,SUM(CASE WHEN revenue_countable=1 THEN COALESCE(order_amount,0) ELSE 0 END) AS revenue FROM leads WHERE assigned_to=? GROUP BY status`,[uid]),
-      query(`SELECT s.status, COUNT(l.id) AS cnt, COALESCE(SUM(CASE WHEN o.revenue_countable = 1 THEN COALESCE(o.amount, 0) ELSE 0 END), 0 ) AS revenue FROM ( SELECT 'new' AS status UNION ALL SELECT 'in_process' UNION ALL SELECT 'follow_up' UNION ALL SELECT 'cnr' UNION ALL SELECT 'converted' UNION ALL SELECT 'delivered' UNION ALL SELECT 'cancelled' UNION ALL SELECT 'dead') s LEFT JOIN leads l ON l.status = s.status AND l.assigned_to = ? LEFT JOIN orders o ON o.assigned_to = l.assigned_to AND o.revenue_countable = 1 and o.status='delivered' GROUP BY s.status ORDER BY FIELD(s.status, 'new', 'in_process', 'follow_up', 'cnr', 'converted', 'delivered', 'cancelled', 'dead')`,[uid]),
-      query(`SELECT COUNT(*) AS c FROM orders WHERE assigned_to=? AND is_repeat=1`,[uid]),
-      query(`SELECT COUNT(*) AS cus FROM customers WHERE assigned_to=? AND is_active=1`,[uid]),
-      query(`SELECT YEAR(delivery_date) AS yr,MONTH(delivery_date) AS mo,SUM(amount) AS revenue,COUNT(*) AS orders FROM orders WHERE assigned_to=? AND revenue_countable=1 AND delivery_date>=DATE_SUB(NOW(),INTERVAL 6 MONTH) GROUP BY yr,mo ORDER BY yr,mo`,[uid]),
-      query(`SELECT status,COUNT(*) AS cnt FROM leads WHERE assigned_to=? GROUP BY status`,[uid]),
-      query(`SELECT status,SUM(incentive_amount) AS total,COUNT(*) AS cnt FROM incentives WHERE user_id=? GROUP BY status`,[uid]),
-    ]);
-    const cards={assigned:0,converted:0,delivered:0,pending:0,repeat_orders:Number(repCnt[0].c||0),customers: Number(custCnt[0].cus || 0),total_revenue:0,total: 0,in_process: 0, follow_up: 0,};
-    kpis.forEach(k=>{cards.assigned+=Number(k.cnt);cards.total    += Number(k.cnt); cards.total_revenue+=Number(k.revenue||0);if(['converted'].includes(k.status))cards.converted+=Number(k.cnt);if(['new','in_process','follow_up'].includes(k.status))cards.pending+=Number(k.cnt);if(k.status==='delivered')cards.delivered=Number(k.cnt);
-      if (k.status === 'in_process') cards.in_process  = Number(k.cnt);  // ← YE
-      if (k.status === 'follow_up')  cards.follow_up   = Number(k.cnt);  // ← YE
-      if (k.status === 'new')        cards.new          = Number(k.cnt);  // ← YE
-    });
-    const inc={pending:0,approved:0,paid:0};
-    incSummary.forEach(i=>{inc[i.status]=Number(i.total||0);});
+    const uid = req.user.id;
 
-    const n=new Date();const s=new Date(n);s.setHours(0,0,0,0);const e=new Date(n);e.setHours(23,59,59,999);
-    const [[ov],[td],[up]] = await Promise.all([
-      query(`SELECT COUNT(*) AS c FROM leads WHERE assigned_to=? AND status='follow_up' AND next_followup_at<?`,[uid,s]),
-      query(`SELECT COUNT(*) AS c FROM leads WHERE assigned_to=? AND status='follow_up' AND next_followup_at BETWEEN ? AND ?`,[uid,s,e]),
-      query(`SELECT COUNT(*) AS c FROM leads WHERE assigned_to=? AND status='follow_up' AND next_followup_at>?`,[uid,e]),
+    const [kpis, revRow, repCnt, custCnt, monthly, byStatus, incSummary] = await Promise.all([
+      // ✅ Fix 1 — sirf leads count karo (revenue yahan mat lo)
+      query(`SELECT status, COUNT(*) AS cnt
+             FROM leads WHERE assigned_to=? GROUP BY status`, [uid]),
+
+      // ✅ Fix 2 — revenue sirf delivered orders se lo
+      query(`SELECT COALESCE(SUM(amount), 0) AS total_revenue
+             FROM orders
+             WHERE assigned_to=? AND status='delivered' AND revenue_countable=1`, [uid]),
+
+      query(`SELECT COUNT(*) AS c FROM orders WHERE assigned_to=? AND is_repeat=1`, [uid]),
+      query(`SELECT COUNT(*) AS cus FROM customers WHERE assigned_to=? AND is_active=1`, [uid]),
+      query(`SELECT YEAR(delivery_date) AS yr, MONTH(delivery_date) AS mo,
+               SUM(amount) AS revenue, COUNT(*) AS orders
+             FROM orders
+             WHERE assigned_to=? AND revenue_countable=1
+               AND delivery_date>=DATE_SUB(NOW(),INTERVAL 6 MONTH)
+             GROUP BY yr,mo ORDER BY yr,mo`, [uid]),
+      query(`SELECT status, COUNT(*) AS cnt FROM leads WHERE assigned_to=? GROUP BY status`, [uid]),
+      query(`SELECT status, SUM(incentive_amount) AS total, COUNT(*) AS cnt
+             FROM incentives WHERE user_id=? GROUP BY status`, [uid]),
     ]);
-    res.json({ success:true, cards, monthlyGraph:monthly, byStatus, incentiveSummary:inc, followUps:{overdue:Number(ov.c),today:Number(td.c),upcoming:Number(up.c)} });
-  } catch(err){ next(err); }
+
+    const cards = {
+      assigned: 0, converted: 0, delivered: 0, pending: 0,
+      repeat_orders: Number(repCnt[0]?.c || 0),
+      customers:     Number(custCnt[0]?.cus || 0),
+      // ✅ Fix 3 — delivered orders se revenue
+      total_revenue: Number(revRow[0]?.total_revenue || 0),
+      total: 0, new: 0, in_process: 0, follow_up: 0, cnr: 0,
+    };
+
+    kpis.forEach(k => {
+      cards.total    += Number(k.cnt);
+      cards.assigned += Number(k.cnt);
+      if (['converted', 'delivered'].includes(k.status)) cards.converted  += Number(k.cnt);
+      if (['new','in_process','follow_up'].includes(k.status)) cards.pending += Number(k.cnt);
+      if (k.status === 'delivered')  cards.delivered  = Number(k.cnt);
+      if (k.status === 'in_process') cards.in_process = Number(k.cnt);
+      if (k.status === 'follow_up')  cards.follow_up  = Number(k.cnt);
+      if (k.status === 'new')        cards.new        = Number(k.cnt);
+      if (k.status === 'cnr')        cards.cnr        = Number(k.cnt);
+    });
+
+    const inc = { pending: 0, approved: 0, paid: 0 };
+    incSummary.forEach(i => { inc[i.status] = Number(i.total || 0); });
+
+    // ✅ Fix 4 — [[ov],[td],[up]] → [ov,td,up] then [0]
+    const n = new Date();
+    const s = new Date(n); s.setHours(0, 0, 0, 0);
+    const e = new Date(n); e.setHours(23, 59, 59, 999);
+    const [ov, td, up] = await Promise.all([
+      query(`SELECT COUNT(*) AS c FROM leads WHERE assigned_to=? AND status='follow_up' AND next_followup_at<?`, [uid, s]),
+      query(`SELECT COUNT(*) AS c FROM leads WHERE assigned_to=? AND status='follow_up' AND next_followup_at BETWEEN ? AND ?`, [uid, s, e]),
+      query(`SELECT COUNT(*) AS c FROM leads WHERE assigned_to=? AND status='follow_up' AND next_followup_at>?`, [uid, e]),
+    ]);
+
+    res.json({
+      success: true, cards, monthlyGraph: monthly, byStatus,
+      incentiveSummary: inc,
+      followUps: {
+        overdue:  Number(ov[0].c),
+        today:    Number(td[0].c),
+        upcoming: Number(up[0].c)
+      }
+    });
+  } catch(err) { next(err); }
 });
 
 // ================================================================
