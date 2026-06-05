@@ -311,7 +311,7 @@ dashRouter.get('/user', async (req, res, next) => {
     ]);
 
     res.json({
-      success: true, cards, monthlyGraph: monthly, byStatus,
+      success: true, cards, monthlyRevenue: monthly, byStatus,
       incentiveSummary: inc,
       followUps: {
         overdue:  Number(ov[0].c),
