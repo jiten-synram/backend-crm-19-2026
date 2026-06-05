@@ -535,7 +535,7 @@ repRouter.get('/export', async (req, res, next) => {
     const rows = leads.map(l=>({
       Name:l.name, Phone:l.phone, Email:l.email||'', Status:l.status, Source:l.source,
       Category:l.category, 'Assigned To':l.assigned_name||'',
-      'Order Amount':l.order_amount||0, 'Payment':l.payment_status || '', 'Tracking ID':l.tracking_id||'', 'Close Date':l.close_date || '', 'Shipping Addr':l.shipping_address || '',
+      'Order Amount':l.order_amount||0, 'Payment1':l.payment_status || '', 'Tracking ID':l.tracking_id||'', 'Close Date':l.close_date || '', 'Shipping Addr':l.shipping_address || '',
       'Repeat':l.is_repeat?'Yes':'No', Campaign:l.campaign_name||'',
       'Created':new Date(l.created_at).toLocaleDateString('en-IN'),
       'Follow-up':l.next_followup_at?new Date(l.next_followup_at).toLocaleDateString('en-IN'):'',
@@ -564,189 +564,189 @@ repRouter.get('/export', async (req, res, next) => {
   } catch(err){ next(err); }
 });
 
-// ordersRouter.get('/export', async (req, res, next) => {
-//   try {
-//     const { format = 'excel', status, payment_status, date_from, date_to } = req.query;
-//     let where = '1=1'; const p = [];
-//     if (!isAdmin(req.user)) { where += ' AND o.assigned_to=?'; p.push(req.user.id); }
-//     if (status)         { where += ' AND o.status=?';          p.push(status); }
-//     if (payment_status) { where += ' AND o.payment_status=?';  p.push(payment_status); }
-//     if (date_from)      { where += ' AND o.order_date >= ?';  p.push(date_from); } 
-//     if (date_to)        { where += ' AND o.order_date <= ?';  p.push(date_to); }  
-
-//     const orders = await query(`
-//       SELECT o.*, l.name AS lead_name, l.phone AS lead_phone,
-//              c.name AS customer_name, u.name AS agent_name
-//       FROM orders o
-//       LEFT JOIN leads l     ON l.id = o.lead_id
-//       LEFT JOIN customers c ON c.id = o.customer_id
-//       LEFT JOIN users u     ON u.id = o.assigned_to
-//       WHERE ${where} ORDER BY o.created_at DESC
-//     `, p);
-
-//     const rows = orders.map(o => ({
-//       'Product':        o.product_name,
-//       'Customer':       o.customer_name || o.lead_name || '',
-//       'Phone':          o.lead_phone || '',
-//       'Agent':          o.agent_name || '',
-//       'Amount':         o.amount,
-//       'Payment':        o.payment_status || '',
-//       'Tracking ID':    o.tracking_id || '',
-//       'Order Date':     o.order_date ? new Date(o.order_date).toLocaleDateString('en-IN') : '',
-//       'Delivery Date':  o.delivery_date ? new Date(o.delivery_date).toLocaleDateString('en-IN') : '',
-//       'Status':         o.status,
-//       'Source':         o.source,
-//       'Repeat':         o.is_repeat ? 'Yes' : 'No',
-//     }));
-
-//     if (format === 'csv') {
-//       const { Parser } = require('json2csv');
-//       const parser = new Parser({ fields: Object.keys(rows[0] || {}) });
-//       res.setHeader('Content-Type', 'text/csv');
-//       res.setHeader('Content-Disposition', `attachment; filename="orders-${Date.now()}.csv"`);
-//       return res.send(parser.parse(rows));
-//     }
-
-//     const ExcelJS = require('exceljs');
-//     const wb = new ExcelJS.Workbook();
-//     const ws = wb.addWorksheet('Orders');
-//     if (rows.length) {
-//       ws.columns = Object.keys(rows[0]).map(k => ({ header: k, key: k, width: 18 }));
-//       ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-//       ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF162B20' } };
-//       rows.forEach(r => ws.addRow(r));
-//     }
-//     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-//     res.setHeader('Content-Disposition', `attachment; filename="orders-${Date.now()}.xlsx"`);
-//     await wb.xlsx.write(res); res.end();
-//   } catch(err) { next(err); }
-// });
-
 ordersRouter.get('/export', async (req, res, next) => {
   try {
     const { format = 'excel', status, payment_status, date_from, date_to } = req.query;
-
-    // ── WHERE clause ──────────────────────────────────────────
     let where = '1=1'; const p = [];
     if (!isAdmin(req.user)) { where += ' AND o.assigned_to=?'; p.push(req.user.id); }
-    if (status)         { where += ' AND o.status=?';         p.push(status); }
-    if (payment_status) { where += ' AND o.payment_status=?'; p.push(payment_status); }
-    if (date_from)      { where += ' AND o.order_date >= ?';  p.push(date_from); }
-    if (date_to)        { where += ' AND o.order_date <= ?';  p.push(date_to); }
+    if (status)         { where += ' AND o.status=?';          p.push(status); }
+    if (payment_status) { where += ' AND o.payment_status=?';  p.push(payment_status); }
+    if (date_from)      { where += ' AND o.order_date >= ?';  p.push(date_from); } 
+    if (date_to)        { where += ' AND o.order_date <= ?';  p.push(date_to); }  
 
-    // ── Leads (is_repeat = 0) ──────────────────────────────────
-    const leads = await query(`
+    const orders = await query(`
       SELECT o.*, l.name AS lead_name, l.phone AS lead_phone,
-             c.name AS customer_name, c.phone AS customer_phone,
-             u.name AS agent_name
+             c.name AS customer_name, u.name AS agent_name
       FROM orders o
-      LEFT JOIN leads    l ON l.id = o.lead_id
+      LEFT JOIN leads l     ON l.id = o.lead_id
       LEFT JOIN customers c ON c.id = o.customer_id
-      LEFT JOIN users    u ON u.id = o.assigned_to
-      WHERE ${where} AND o.is_repeat = 0
-      ORDER BY o.created_at DESC
+      LEFT JOIN users u     ON u.id = o.assigned_to
+      WHERE ${where} ORDER BY o.created_at DESC
     `, p);
 
-    // ── Reorders (is_repeat = 1) ───────────────────────────────
-    const reorders = await query(`
-      SELECT o.*, l.name AS lead_name, l.phone AS lead_phone,
-             c.name AS customer_name, c.phone AS customer_phone,
-             u.name AS agent_name
-      FROM orders o
-      LEFT JOIN leads    l ON l.id = o.lead_id
-      LEFT JOIN customers c ON c.id = o.customer_id
-      LEFT JOIN users    u ON u.id = o.assigned_to
-      WHERE ${where} AND o.is_repeat = 1
-      ORDER BY o.created_at DESC
-    `, p);
+    const rows = orders.map(o => ({
+      'Product':        o.product_name,
+      'Customer':       o.customer_name || o.lead_name || '',
+      'Phone':          o.lead_phone || '',
+      'Agent':          o.agent_name || '',
+      'Amount':         o.amount,
+      'Payment':        o.payment_status || '',
+      'Tracking ID':    o.tracking_id || '',
+      'Order Date':     o.order_date ? new Date(o.order_date).toLocaleDateString('en-IN') : '',
+      'Delivery Date':  o.delivery_date ? new Date(o.delivery_date).toLocaleDateString('en-IN') : '',
+      'Status':         o.status,
+      'Source':         o.source,
+      'Repeat':         o.is_repeat ? 'Yes' : 'No',
+    }));
 
-    // ── Row mapper — dono ke liye same ────────────────────────
-    const toRow = (o) => ({
-      'Customer':       o.customer_name || o.lead_name || '—',
-      'Phone':          o.customer_phone || o.lead_phone || '—',
-      'Agent':          o.agent_name || '—',
-      'Product':        o.product_name || '—',
-      'Amount':         Number(o.amount || 0),
-      'Payment':        o.payment_status || '—',
-      'Tracking ID':    o.tracking_id || '—',
-      'Courier':        o.courier || '—',
-      'Order Date':     o.order_date     ? new Date(o.order_date).toLocaleDateString('en-IN')     : '—',
-      'Dispatch Date':  o.dispatch_date  ? new Date(o.dispatch_date).toLocaleDateString('en-IN')  : '—',
-      'Delivery Date':  o.delivery_date  ? new Date(o.delivery_date).toLocaleDateString('en-IN')  : '—',
-      'Cancelled Date': o.cancelled_date ? new Date(o.cancelled_date).toLocaleDateString('en-IN') : '—',
-      'Status':         o.status || '—',
-      'Remark':         o.remark || '—',
-      'Source':         o.source || '—',
-    });
-
-    const leadRows    = leads.map(toRow);
-    const reorderRows = reorders.map(toRow);
-
-    // ── CSV — dono ko combine karke ek file ───────────────────
     if (format === 'csv') {
-      const allRows = [
-        ...leadRows,
-        ...reorderRows,
-      ];
-      if (!allRows.length) {
-        res.setHeader('Content-Type', 'text/csv');
-        return res.send('No data found');
-      }
-      const parser = new Parser({ fields: Object.keys(allRows[0]) });
+      const { Parser } = require('json2csv');
+      const parser = new Parser({ fields: Object.keys(rows[0] || {}) });
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="orders-${Date.now()}.csv"`);
-      return res.send(parser.parse(allRows));
+      return res.send(parser.parse(rows));
     }
 
-    // ── Excel — 2 alag sheets ─────────────────────────────────
+    const ExcelJS = require('exceljs');
     const wb = new ExcelJS.Workbook();
-
-    const addSheet = (wb, name, rows, tabColor) => {
-      const ws = wb.addWorksheet(name, {
-        properties: { tabColor: { argb: tabColor } }
-      });
-      if (!rows.length) {
-        ws.addRow(['No data found']);
-        return;
-      }
-      // Header row
-      ws.columns = Object.keys(rows[0]).map(k => ({
-        header: k, key: k,
-        width: ['Customer','Product','Remark','Courier'].includes(k) ? 24 : 16,
-      }));
+    const ws = wb.addWorksheet('Orders');
+    if (rows.length) {
+      ws.columns = Object.keys(rows[0]).map(k => ({ header: k, key: k, width: 18 }));
       ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tabColor } };
-      ws.getRow(1).height = 20;
-
-      // Data rows with alternating color
-      rows.forEach((r, i) => {
-        const row = ws.addRow(r);
-        if (i % 2 === 0) {
-          row.eachCell(c => {
-            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F9F7' } };
-          });
-        }
-      });
-
-      // Summary row at bottom
-      ws.addRow([]);
-      const sumRow = ws.addRow({
-        Customer: `Total: ${rows.length} records`,
-        Amount: rows.reduce((s, r) => s + (Number(r['Amount']) || 0), 0),
-      });
-      sumRow.font = { bold: true };
-    };
-
-    addSheet(wb, 'Leads',    leadRows,    'FF162B20');  // dark green
-    addSheet(wb, 'Reorders', reorderRows, 'FFB45309');  // amber
-
+      ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF162B20' } };
+      rows.forEach(r => ws.addRow(r));
+    }
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="orders-export-${Date.now()}.xlsx"`);
-    await wb.xlsx.write(res);
-    res.end();
-
+    res.setHeader('Content-Disposition', `attachment; filename="orders-${Date.now()}.xlsx"`);
+    await wb.xlsx.write(res); res.end();
   } catch(err) { next(err); }
 });
+
+// ordersRouter.get('/export', async (req, res, next) => {
+//   try {
+//     const { format = 'excel', status, payment_status, date_from, date_to } = req.query;
+
+//     // ── WHERE clause ──────────────────────────────────────────
+//     let where = '1=1'; const p = [];
+//     if (!isAdmin(req.user)) { where += ' AND o.assigned_to=?'; p.push(req.user.id); }
+//     if (status)         { where += ' AND o.status=?';         p.push(status); }
+//     if (payment_status) { where += ' AND o.payment_status=?'; p.push(payment_status); }
+//     if (date_from)      { where += ' AND o.order_date >= ?';  p.push(date_from); }
+//     if (date_to)        { where += ' AND o.order_date <= ?';  p.push(date_to); }
+
+//     // ── Leads (is_repeat = 0) ──────────────────────────────────
+//     const leads = await query(`
+//       SELECT o.*, l.name AS lead_name, l.phone AS lead_phone,
+//              c.name AS customer_name, c.phone AS customer_phone,
+//              u.name AS agent_name
+//       FROM orders o
+//       LEFT JOIN leads    l ON l.id = o.lead_id
+//       LEFT JOIN customers c ON c.id = o.customer_id
+//       LEFT JOIN users    u ON u.id = o.assigned_to
+//       WHERE ${where} AND o.is_repeat = 0
+//       ORDER BY o.created_at DESC
+//     `, p);
+
+//     // ── Reorders (is_repeat = 1) ───────────────────────────────
+//     const reorders = await query(`
+//       SELECT o.*, l.name AS lead_name, l.phone AS lead_phone,
+//              c.name AS customer_name, c.phone AS customer_phone,
+//              u.name AS agent_name
+//       FROM orders o
+//       LEFT JOIN leads    l ON l.id = o.lead_id
+//       LEFT JOIN customers c ON c.id = o.customer_id
+//       LEFT JOIN users    u ON u.id = o.assigned_to
+//       WHERE ${where} AND o.is_repeat = 1
+//       ORDER BY o.created_at DESC
+//     `, p);
+
+//     // ── Row mapper — dono ke liye same ────────────────────────
+//     const toRow = (o) => ({
+//       'Customer':       o.customer_name || o.lead_name || '—',
+//       'Phone':          o.customer_phone || o.lead_phone || '—',
+//       'Agent':          o.agent_name || '—',
+//       'Product':        o.product_name || '—',
+//       'Amount':         Number(o.amount || 0),
+//       'Payment':        o.payment_status || '—',
+//       'Tracking ID':    o.tracking_id || '—',
+//       'Courier':        o.courier || '—',
+//       'Order Date':     o.order_date     ? new Date(o.order_date).toLocaleDateString('en-IN')     : '—',
+//       'Dispatch Date':  o.dispatch_date  ? new Date(o.dispatch_date).toLocaleDateString('en-IN')  : '—',
+//       'Delivery Date':  o.delivery_date  ? new Date(o.delivery_date).toLocaleDateString('en-IN')  : '—',
+//       'Cancelled Date': o.cancelled_date ? new Date(o.cancelled_date).toLocaleDateString('en-IN') : '—',
+//       'Status':         o.status || '—',
+//       'Remark':         o.remark || '—',
+//       'Source':         o.source || '—',
+//     });
+
+//     const leadRows    = leads.map(toRow);
+//     const reorderRows = reorders.map(toRow);
+
+//     // ── CSV — dono ko combine karke ek file ───────────────────
+//     if (format === 'csv') {
+//       const allRows = [
+//         ...leadRows,
+//         ...reorderRows,
+//       ];
+//       if (!allRows.length) {
+//         res.setHeader('Content-Type', 'text/csv');
+//         return res.send('No data found');
+//       }
+//       const parser = new Parser({ fields: Object.keys(allRows[0]) });
+//       res.setHeader('Content-Type', 'text/csv');
+//       res.setHeader('Content-Disposition', `attachment; filename="orders-${Date.now()}.csv"`);
+//       return res.send(parser.parse(allRows));
+//     }
+
+//     // ── Excel — 2 alag sheets ─────────────────────────────────
+//     const wb = new ExcelJS.Workbook();
+
+//     const addSheet = (wb, name, rows, tabColor) => {
+//       const ws = wb.addWorksheet(name, {
+//         properties: { tabColor: { argb: tabColor } }
+//       });
+//       if (!rows.length) {
+//         ws.addRow(['No data found']);
+//         return;
+//       }
+//       // Header row
+//       ws.columns = Object.keys(rows[0]).map(k => ({
+//         header: k, key: k,
+//         width: ['Customer','Product','Remark','Courier'].includes(k) ? 24 : 16,
+//       }));
+//       ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+//       ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tabColor } };
+//       ws.getRow(1).height = 20;
+
+//       // Data rows with alternating color
+//       rows.forEach((r, i) => {
+//         const row = ws.addRow(r);
+//         if (i % 2 === 0) {
+//           row.eachCell(c => {
+//             c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F9F7' } };
+//           });
+//         }
+//       });
+
+//       // Summary row at bottom
+//       ws.addRow([]);
+//       const sumRow = ws.addRow({
+//         Customer: `Total: ${rows.length} records`,
+//         Amount: rows.reduce((s, r) => s + (Number(r['Amount']) || 0), 0),
+//       });
+//       sumRow.font = { bold: true };
+//     };
+
+//     addSheet(wb, 'Leads',    leadRows,    'FF162B20');  // dark green
+//     addSheet(wb, 'Reorders', reorderRows, 'FFB45309');  // amber
+
+//     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+//     res.setHeader('Content-Disposition', `attachment; filename="orders-export-${Date.now()}.xlsx"`);
+//     await wb.xlsx.write(res);
+//     res.end();
+
+//   } catch(err) { next(err); }
+// });
 
 repRouter.get('/campaigns-list', async (req, res, next) => {
   try {
