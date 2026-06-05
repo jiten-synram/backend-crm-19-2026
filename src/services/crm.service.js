@@ -411,6 +411,7 @@ const processOrderDelivered = async (leadId, deliveryDate, trackingId = null) =>
       UPDATE leads
       SET delivery_date=?,
           status="delivered",
+          revenue_countable=1,
           updated_at=NOW()
       WHERE id=?
     `, [deliveryDate, leadId]);
