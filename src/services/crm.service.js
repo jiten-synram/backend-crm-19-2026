@@ -486,6 +486,18 @@ const processOrderCancelled = async (orderId, cancelledDate, trackingId = null) 
       trackingId || order.tracking_id || null,
       order.order_date
     ]);
+
+  if (Number(order?.lead_id) > 0) {
+  await conn.execute(`
+    UPDATE leads
+    SET cancelled_date=?,
+        status='cancelled',
+        revenue_countable=0,
+        updated_at=NOW()
+    WHERE id=?
+  `, [cancelledDate, order.lead_id]);
+}
+    
   });
 };
 
