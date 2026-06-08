@@ -627,6 +627,81 @@ repRouter.get('/incentives', async (req, res, next) => {
   } catch(err){ next(err); }
 });
 
+// ── PATCH /api/reports/incentives/:id/status ──────────────────────
+repRouter.patch('/incentives/:id/status', authorize('admin', 'sub_admin'), async (req, res, next) => {
+  try {
+    const { status, notes } = req.body;
+    const validStatuses = ['pending', 'approved', 'paid', 'rejected'];
+
+    if (!validStatuses.includes(status)) {
+      throw new AppError('Invalid status. Must be: pending, approved, paid, rejected.');
+    }
+
+    const [incentive] = await query('SELECT * FROM incentives WHERE id=?', [req.params.id]);
+    if (!incentive) throw new AppError('Incentive not found.', 404);
+
+    const sets  = ['status=?'];
+    const vals  = [status];
+
+    if (status === 'paid') {
+      sets.push('paid_at=NOW()');
+      sets.push('approved_by=?');
+      vals.push(req.user.id);
+    }
+    if (status === 'approved') {
+      sets.push('approved_by=?');
+      vals.push(req.user.id);
+    }
+    if (notes !== undefined) {
+      sets.push('notes=?');
+      vals.push(notes || null);
+    }
+    sets.push('updated_at=NOW()');
+    vals.push(req.params.id);
+
+    await query(`UPDATE incentives SET ${sets.join(',')} WHERE id=?`, vals);
+
+    const [updated] = await query(`
+      SELECT i.*, u.name AS user_name, u.email AS user_email,
+             l.name AS lead_name, o.product_name
+      FROM incentives i
+      LEFT JOIN users u  ON u.id = i.user_id
+      LEFT JOIN leads l  ON l.id = i.lead_id
+      LEFT JOIN orders o ON o.id = i.order_id
+      WHERE i.id=?
+    `, [req.params.id]);
+
+    res.json({ success: true, incentive: updated });
+  } catch (err) { next(err); }
+});
+
+// ── PATCH /api/reports/incentives/bulk-status ─────────────────────
+// Bulk approve ya paid mark karne ke liye
+repRouter.patch('/incentives/bulk-status', authorize('admin', 'sub_admin'), async (req, res, next) => {
+  try {
+    const { ids, status, notes } = req.body;
+    if (!ids?.length) throw new AppError('ids array required.');
+    const validStatuses = ['approved', 'paid', 'rejected'];
+    if (!validStatuses.includes(status)) throw new AppError('Invalid status.');
+
+    const sets = ['status=?'];
+    const vals = [status];
+
+    if (status === 'paid')     { sets.push('paid_at=NOW()'); sets.push('approved_by=?'); vals.push(req.user.id); }
+    if (status === 'approved') { sets.push('approved_by=?'); vals.push(req.user.id); }
+    if (notes) { sets.push('notes=?'); vals.push(notes); }
+    sets.push('updated_at=NOW()');
+
+    const placeholders = ids.map(() => '?').join(',');
+    await query(
+      `UPDATE incentives SET ${sets.join(',')} WHERE id IN (${placeholders})`,
+      [...vals, ...ids]
+    );
+
+    res.json({ success: true, updated: ids.length });
+  } catch (err) { next(err); }
+});
+
 repRouter.get('/export', async (req, res, next) => {
   try {
     const { format='excel' } = req.query;
