@@ -153,6 +153,9 @@ router.post('/', async (req, res, next) => {
     if (!name || !phone) throw new AppError('Name and phone are required.');
     const cleanPhone = phone.replace(/\D/g,'').slice(-10);
 
+    // ✅ mappedCat define karo
+    const mappedCat = category || 'General';
+    
     // Duplicate check
     const [dup] = await query('SELECT id,name,status FROM leads WHERE phone=?', [cleanPhone]);
 
