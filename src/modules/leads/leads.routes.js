@@ -192,6 +192,20 @@ router.post('/', async (req, res, next) => {
     if (notes) await query('INSERT INTO lead_notes (lead_id,added_by,note) VALUES (?,?,?)',
       [leadId, req.user.id, notes]);
 
+    // ✅ Notification — assigned user ko
+    if (assignedTo) {
+      await query(
+        `INSERT INTO notifications (user_id, type, title, message, lead_id)
+         VALUES (?, 'lead_assigned', ?, ?, ?)`,
+        [
+          assignedTo,
+          `New Lead Assigned: ${name.trim()}`,
+          `${mappedCat} — ${cleanPhone}`,
+          leadId
+        ]
+      ).catch(() => {});
+    }
+
     const [lead] = await query('SELECT l.*,u.name AS assigned_name FROM leads l LEFT JOIN users u ON u.id=l.assigned_to WHERE l.id=?', [leadId]);
     res.status(201).json({ success:true, lead, isDuplicate:!!dup, duplicateOf: dup||null });
   } catch (err) { next(err); }
@@ -229,15 +243,31 @@ const placeholders = safeIds.map(() => '?').join(',');
       [assigned_to, req.user.id, ...ids]
     );
 
-    // Activities log
-    for (const id of ids) {
+    // // Activities log
+    // for (const id of ids) {
+    //   await query(
+    //     `INSERT INTO activities (entity_type, entity_id, action, description, performed_by) VALUES ('lead', ?, 'assign', ?, ?)`,
+    //     [id, `Bulk assigned to ${agent.name}`, req.user.id]
+    //   );
+    // }
+
+    // Activities log + Notification
+    for (const id of safeIds) {
       await query(
         `INSERT INTO activities (entity_type, entity_id, action, description, performed_by) VALUES ('lead', ?, 'assign', ?, ?)`,
         [id, `Bulk assigned to ${agent.name}`, req.user.id]
-      );
+      ).catch(() => {});
+
+      // ✅ Notification — har lead ke liye
+      await query(
+        `INSERT INTO notifications (user_id, type, title, message, lead_id)
+         VALUES (?, 'lead_assigned', ?, ?, ?)`,
+        [assigned_to, `Lead Assigned`, `Bulk assigned by admin`, id]
+      ).catch(() => {});
     }
 
-    res.json({ success: true, message: `${ids.length} leads assigned to ${agent.name}` });
+    // res.json({ success: true, message: `${ids.length} leads assigned to ${agent.name}` });
+    res.json({ success: true, message: `${safeIds.length} leads assigned to ${agent.name}` });
   } catch (err) { next(err); }
 });
 
@@ -477,6 +507,17 @@ router.patch('/:id/assign', authorize('admin','sub_admin'), async (req, res, nex
     await query('UPDATE leads SET assigned_to=?,assigned_at=NOW(),assigned_by=?,is_manual_assign=1 WHERE id=?',
       [assigned_to, req.user.id, req.params.id]);
     const [lead] = await query('SELECT l.*,u.name AS assigned_name FROM leads l LEFT JOIN users u ON u.id=l.assigned_to WHERE l.id=?', [req.params.id]);
+    // ✅ Notification — assigned user ko
+    await query(
+      `INSERT INTO notifications (user_id, type, title, message, lead_id)
+       VALUES (?, 'lead_assigned', ?, ?, ?)`,
+      [
+        assigned_to,
+        `Lead Assigned: ${lead.name}`,
+        `${lead.category} — ${lead.phone}`,
+        lead.id
+      ]
+    ).catch(() => {});
     res.json({ success:true, lead });
   } catch (err) { next(err); }
 });
