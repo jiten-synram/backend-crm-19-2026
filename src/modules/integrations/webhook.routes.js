@@ -87,7 +87,21 @@ router.post('/meta-leads', async (req, res, next) => {
 
     await query('UPDATE webhook_logs SET status=?,lead_id=?,processed_at=NOW() WHERE id=?',
       ['success', leadId, logId]);
-
+    
+    // Lead create ho gayi — ab assigned user ko notify karo
+      if (assignedTo) {
+        await query(
+          `INSERT INTO notifications (user_id, type, title, message, lead_id)
+          VALUES (?, 'lead_assigned', ?, ?, ?)`,
+          [
+            assignedTo,
+            `New Lead Assigned: ${name.trim()}`,
+            `${mappedCat} — ${cleanPhone}`,
+            leadId
+          ]
+        ).catch(() => {}); // non-blocking
+      }
+    
     // WhatsApp auto-reply (non-blocking)
     sendWA(cleanPhone, `Namaste ${name}! 🙏 Thank you for contacting Yogveda Healthcare. Our specialist will call you shortly for ${mappedCat}.`).catch(() => {});
 
