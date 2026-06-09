@@ -38,6 +38,7 @@ app.use('/api/reports',      require('./modules/reports/reports.routes'));
 app.use('/api/webhooks',     require('./modules/integrations/webhook.routes'));
 app.use('/api/integrations', require('./modules/integrations/settings.routes'));
 app.use('/api/campaigns', require('./modules/campaigns/campaigns.routes'));
+app.use('/api/notifications', require('./modules/notifications/notifications.routes'));
 
 // ── 404 ────────────────────────────────────────────────────────
 app.use((req, res) =>
