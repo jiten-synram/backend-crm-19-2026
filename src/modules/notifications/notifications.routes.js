@@ -9,15 +9,17 @@ router.use(protect);
 // GET /api/notifications — apni notifications lo
 router.get('/', async (req, res, next) => {
   try {
-    const limit = parseInt(req.query.limit) || 20;
+    // const limit = parseInt(req.query.limit) || 20;
+    const limitNum  = parseInt(req.query.limit  || '30');
+  const offsetNum = parseInt(req.query.offset || '0');
     const notifications = await query(`
       SELECT n.*, l.name AS lead_name, l.phone AS lead_phone, l.category AS lead_category
       FROM notifications n
       LEFT JOIN leads l ON l.id = n.lead_id
       WHERE n.user_id = ?
       ORDER BY n.created_at DESC
-      LIMIT ?
-    `, [req.user.id, limit]);
+      LIMIT ${limitNum} OFFSET ${offsetNum}
+    `, [req.user.id]);
 
     const [{ unread }] = await query(
       'SELECT COUNT(*) AS unread FROM notifications WHERE user_id=? AND is_read=0',
