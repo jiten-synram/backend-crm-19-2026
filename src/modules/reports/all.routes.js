@@ -97,6 +97,85 @@ ordersRouter.patch('/:id/tracking', async (req, res, next) => {
   } catch(err) { next(err); }
 });
 
+// ordersRouter mein add karo — GET aur PATCH tracking ke beech
+ordersRouter.patch('/:id/edit', async (req, res, next) => {
+  try {
+    const { product_name, amount, payment_status, shipping_address } = req.body;
+    const orderId = Number(req.params.id);
+
+    const [order] = await query('SELECT * FROM orders WHERE id=?', [orderId]);
+    if (!order) throw new AppError('Order not found.', 404);
+
+    const newAmount    = amount ? Number(amount) : Number(order.amount);
+    const oldAmount    = Number(order.amount);
+    const amountChanged = newAmount !== oldAmount;
+    const diff          = newAmount - oldAmount;
+
+    // ✅ Order update
+    const sets = []; const vals = [];
+    if (product_name)    { sets.push('product_name=?');     vals.push(product_name); }
+    if (amount)          { sets.push('amount=?');           vals.push(newAmount); }
+    if (payment_status)  { sets.push('payment_status=?');   vals.push(payment_status); }
+    if (shipping_address){ sets.push('shipping_address=?'); vals.push(shipping_address); }
+    if (!sets.length) throw new AppError('Kuch bhi update nahi kiya.', 400);
+    sets.push('updated_at=NOW()');
+    vals.push(orderId);
+    await query(`UPDATE orders SET ${sets.join(',')} WHERE id=?`, vals);
+
+    // ✅ Delivered + amount changed — recalculate sab kuch
+    if (order.status === 'delivered' && order.revenue_countable && amountChanged && order.customer_id) {
+
+      // Step 1 — revenue update
+      await query(`
+        UPDATE customers SET
+          total_revenue  = total_revenue + ?,
+          lifetime_value = lifetime_value + ?
+        WHERE id = ?
+      `, [diff, diff, order.customer_id]);
+
+      // Step 2 — avg alag query se (sahi calculate hoga)
+      await query(`
+        UPDATE customers
+        SET avg_order_value = CASE
+          WHEN total_orders > 0 THEN total_revenue / total_orders
+          ELSE 0 END
+        WHERE id = ?
+      `, [order.customer_id]);
+
+      // Step 3 — purchase amount update
+      await query(
+        'UPDATE purchases SET product_name=?, amount=? WHERE order_id=?',
+        [product_name, newAmount, orderId]
+      );
+
+      // Step 4 — incentive recalculate (sirf pending/approved wala)
+      const [existing] = await query(
+        `SELECT * FROM incentives WHERE order_id=? AND status != 'paid' LIMIT 1`,
+        [orderId]
+      );
+
+      if (existing) {
+        const [agent] = await query(
+          'SELECT incentive_rate FROM users WHERE id=?', [order.assigned_to]
+        );
+        if (agent && parseFloat(agent.incentive_rate) > 0) {
+          const newIncentive = Math.round(
+            newAmount * parseFloat(agent.incentive_rate) / 100
+          );
+          await query(`
+            UPDATE incentives
+            SET order_amount=?, incentive_amount=?, updated_at=NOW()
+            WHERE order_id=? AND status != 'paid'
+          `, [newAmount, newIncentive, orderId]);
+        }
+      }
+    }
+
+    const [updated] = await query('SELECT * FROM orders WHERE id=?', [orderId]);
+    res.json({ success: true, order: updated });
+  } catch(err) { next(err); }
+});
+
 // ================================================================
 // TEAM
 // ================================================================
