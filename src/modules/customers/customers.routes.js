@@ -125,21 +125,53 @@ router.patch('/:customerId/orders/:orderId/cancel', async (req, res, next) => {
       [orderId]
     );
 
+    // incentive record bhi delete karo
+    await query(
+      `DELETE FROM incentives WHERE order_id=?`,
+      [orderId]
+    );
+
     // Agar delivered tha toh customer stats se ghataao
     if (wasDelivered) {
+      // await query(`
+      //   UPDATE customers
+      //   SET total_orders    = GREATEST(total_orders - 1, 0),
+      //       total_revenue   = GREATEST(total_revenue - ?, 0),
+      //       lifetime_value  = GREATEST(lifetime_value - ?, 0),
+      //       avg_order_value = CASE
+      //         WHEN (total_orders - 1) > 0
+      //         THEN (total_revenue - ?) / (total_orders - 1)
+      //         ELSE 0
+      //       END
+      //   WHERE id=?
+      // `, [order.amount, order.amount, order.amount, customerId]);
+
+      // new code
       await query(`
         UPDATE customers
-        SET total_orders    = GREATEST(total_orders - 1, 0),
-            total_revenue   = GREATEST(total_revenue - ?, 0),
-            lifetime_value  = GREATEST(lifetime_value - ?, 0),
-            avg_order_value = CASE
-              WHEN (total_orders - 1) > 0
-              THEN (total_revenue - ?) / (total_orders - 1)
-              ELSE 0
-            END
-        WHERE id=?
+        SET
+          total_orders = IF(total_orders > 0, total_orders - 1, 0),
+          total_revenue = GREATEST(total_revenue - ?, 0),
+          lifetime_value = GREATEST(lifetime_value - ?, 0),
+          avg_order_value = CASE
+            WHEN total_orders > 1
+            THEN GREATEST(total_revenue - ?, 0) / (total_orders - 1)
+            ELSE 0
+          END
+        WHERE id = ?
       `, [order.amount, order.amount, order.amount, customerId]);
     }
+
+    if (Number(order?.lead_id) > 0) {
+        await query(`
+          UPDATE leads
+          SET cancelled_date=?,
+              status='cancelled',
+              revenue_countable=0,
+              updated_at=NOW()
+          WHERE id=?
+        `, [cancelled_date, order.lead_id]);
+      }
 
     res.json({ success: true, message: 'Order cancelled.' });
   } catch(err) { console.log("ERROR:", err); next(err); }
