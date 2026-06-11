@@ -21,7 +21,7 @@ router.get('/', async (req, res, next) => {
     const customers = await query(`
       SELECT c.*, u.name AS agent_name
       FROM customers c LEFT JOIN users u ON u.id=c.assigned_to
-      WHERE ${where} ORDER BY c.last_purchase DESC LIMIT ${limitNum} OFFSET ${offset}
+      WHERE ${where} ORDER BY c.last_purchase DESC, c.id DESC LIMIT ${limitNum} OFFSET ${offset}
     `, p);
     res.json({ success:true, total, customers });
   } catch(err){ next(err); }
